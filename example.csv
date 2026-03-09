@@ -1,5 +1,28 @@
-id,name,age,score
-1,Alice,30,95.5
-2,"Bob, Jr.",25,82.0
-3,Charlie,,74.3
-4,"Dana ""The Great""",40,
+id,name,email,age,salary
+1,Alice Johnson,alice@example.com,32,75000.50
+2,Bob Smith,bob@example.com,45,92000.00
+
+
+
+
+
+3,Carol White,carol@example.com,28,68500.75
+
+
+
+
+
+
+4,"O'Brien, Dan",dan@example.com,37,81000.00
+
+
+
+
+
+
+5,Eva Martinez,eva@example.com,41,95500.25
+6,Frank Lee,,29,62000.00
+
+
+
+7,"Jane ""JD"" Doe",jane@example.com,33,77000.00
