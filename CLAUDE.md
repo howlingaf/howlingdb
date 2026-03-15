@@ -1,4 +1,4 @@
-# Project: High-Performance CSV/DB Engine (C++)
+# Project: High-Performance Database Engine (C++)
 ## What this is
 A C++ learning project building a high-performance database engine with CSV ingestion as the entry point. Target domain is public county/local demographics and election data. The developer is a professional data migrations engineer who works in TypeScript day-to-day and is using this project to get low-level exposure to concepts that underpin their existing work.
 ## Developer background
