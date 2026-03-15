@@ -3,15 +3,14 @@
 #include <iostream>
 #include <string>
 #include <variant>
-#include <vector>
 // mmap does exactly that: it 'loads' the whole file into memory as a 1D array
 
-struct Resolved {};
-struct Unresolved {
-  std::vector<std::string> unresolved;
+struct ParseResult {
+  int success_count;
+  int failure_count;
+  int runtime;
 };
 
-using ParseResult = std::variant<Resolved, Unresolved>;
 ParseResult parse(std::ifstream &csv); // return Success or HasUnresolved
 
 std::string PATH_TO_CSV = "./example.csv";
@@ -28,10 +27,11 @@ int main() {
   return 0;
 }
 
+// push to db if row is valid,
 ParseResult parse(std::ifstream &file) {
+  int success_count;
+  int failure_count;
+  int runtime;
   std::cout << "Initiating parsing" << std::endl;
-  // parse -> returns enum with resolved/unresolved writes, most common error
-  // code, time, etc
-  // parse hands off to resolved db or error db
-  return Resolved{};
+  return ParseResult{success_count, failure_count, runtime};
 }
