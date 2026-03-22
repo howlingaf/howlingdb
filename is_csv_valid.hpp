@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -10,15 +11,7 @@ struct Invalid {
 };
 using ValidatorResult = std::variant<Valid, Invalid>;
 
-ValidatorResult is_csv_valid(std::string file); // return Valid, Invalid
-
-// number of values should be less than or equal to number of headers for a
-// given row if its greater its invalid
 ValidatorResult is_csv_valid(std::ifstream &reader) {
-
-  if (!reader.is_open()) {
-    return Invalid{"File cannot be opened."};
-  }
 
   if (reader.peek() == EOF) {
     return Invalid{"File is empty."};
@@ -33,12 +26,36 @@ ValidatorResult is_csv_valid(std::ifstream &reader) {
       return Invalid{"Invalid characters found (likely not text file)."};
     }
   }
+
   reader.clear();
   reader.seekg(0);
-  std::string header;
-  std::getline(reader, header);
-  if (header.find(',') == std::string::npos) {
-    return Invalid{"Header invalid - no commas found"};
+  bool in_quote = false;
+  bool field_start = true;
+
+  while (!reader.eof()) {
+    char curr = reader.get();
+    if (in_quote) {
+      if (curr == '"') {
+        char next = reader.peek();
+        if (next == '"') {
+          reader.ignore();
+        } else if (next == '\n' || next == ',') {
+          in_quote = false;
+        } else {
+          return Invalid{"Ambiguity found with quote due to double quotes"};
+        }
+      }
+    } else {
+      if (curr == '"' && field_start) {
+        in_quote = true;
+      }
+      field_start = (curr == ',' || curr == '\n');
+    }
   }
+  if (in_quote) {
+    return Invalid{"Ambiguity found with quote due to double quotes"};
+  }
+  reader.clear();
+  reader.seekg(0);
   return Valid{};
 }
