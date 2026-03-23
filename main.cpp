@@ -5,28 +5,58 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
-// mmap does exactly that: it 'loads' the whole file into memory as a 1D array
+// MMAP
+// Do we want a validation pass or do we want to validate and push as we go
+// Error that should halt program (suceeding fields may be malformed)
+// Row error that can be safely skipped
 
-int parse(std::ifstream &csv); // return Success or HasUnresolved
+enum State {
+  Success,
+  PartialSuccess,
+  Failure,
+};
 
-std::string PATH_TO_CSV = "./example.csv";
+std::unordered_map<int, std::string> error_code_to_message = {
+    {1, "Invalid Csv."},
+};
+
+struct ParseResult {
+  State state;
+  std::vector<std::string> invalid_rows;
+  int error_code; // need some mapping code->error message
+};
+
+ParseResult parse(std::ifstream &csv); // return Success or HasUnresolved
+
+std::string PATH_TO_CSV = "customers-10000.csv";
 
 int main() {
   std::ifstream file(PATH_TO_CSV);
-  // ValidatorResult is_valid = is_csv_valid(file);
-  // if (std::holds_alternative<Invalid>(is_valid)) {
-  //   std::cout << std::get<Invalid>(is_valid).reason << std::endl;
-  // } else {
-  //   std::cout << "Csv is valid" << std::endl;
-  // }
-  int parse_result = parse(file);
+
+  if (!file.is_open()) {
+    throw std::runtime_error{"File could not be opened"};
+  };
+
+  ValidatorResult is_valid = is_csv_valid(file);
+  if (std::holds_alternative<Valid>(is_valid)) {
+    std::cout << "Csv is valid" << std::endl;
+    ParseResult parse_result = parse(file);
+  }
+
+  else if (std::holds_alternative<Invalid>(is_valid)) {
+    printf("%s {row:%d,col:%d}", std::get<Invalid>(is_valid).reason.c_str(),
+           std::get<Invalid>(is_valid).error_row,
+           std::get<Invalid>(is_valid).error_row);
+  }
+
   return 0;
 }
 
 // push to db if row is valid,
-int parse(std::ifstream &file) {
+ParseResult parse(std::ifstream &reader) {
   int success_count;
   int failure_count;
   int runtime;
@@ -34,26 +64,30 @@ int parse(std::ifstream &file) {
   bool IN_VALUE = false;
   std::vector<std::string> row;
   std::stringstream value;
-  while (!file.eof()) {
-    char curr = file.get();
+  while (!reader.eof()) {
+    char curr = reader.get();
     if (curr == '"') {
       if (!IN_VALUE) {
-        if (value.tellp() == 0) {
+        if (reader.tellg() == 0) {
+          printf("%d\n", (int)reader.tellg());
           IN_VALUE = true;
         } else {
           value << curr;
         }
         continue;
       }
-      //"ab"c"   "
-      char next = file.peek();
+      char next = reader.peek();
       if (next == '\n' || next == ',') {
         IN_VALUE = false;
       } else if (next == '"') {
         value << curr;
-        file.ignore();
+        reader.ignore();
       } else {
-        throw std::runtime_error("Invalid Row");
+        return ParseResult{
+            Failure,
+            {},
+            1,
+        };
       }
     } else if (curr == ',' && !IN_VALUE) {
       row.push_back(value.str());
@@ -66,11 +100,9 @@ int parse(std::ifstream &file) {
       }
       std::cout << std::endl;
       row.clear();
-    }
-    // any other character
-    else {
+    } else {
       value << curr;
     }
   }
-  return 0;
+  return ParseResult{Success, {}, -1};
 }
