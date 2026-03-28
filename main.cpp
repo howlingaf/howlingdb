@@ -1,4 +1,3 @@
-// https://github.com/Aneurysm9/vm_challenge/blob/main/arch-spec
 #include "is_csv_valid.hpp"
 #include <fstream>
 #include <iostream>
@@ -9,9 +8,6 @@
 #include <variant>
 #include <vector>
 // MMAP
-// Do we want a validation pass or do we want to validate and push as we go
-// Error that should halt program (suceeding fields may be malformed)
-// Row error that can be safely skipped
 
 enum State {
   Success,
