@@ -5,7 +5,7 @@ A C++ learning project building a database engine from scratch. Users upload CSV
 The SQL parsing is handled by a third-party library (e.g. Hyrise sql-parser) which produces a C++ AST struct. Everything else — query execution, storage, indexing — is custom C++.
 
 ## Architecture
-For reference see `design-figure.excalidraw`
+For reference see `resources/design-figure.excalidraw`
 ```
 CSV Upload → Validator → Parser → Storage Engine → .db file
 SQL Query  → SQL Parser (library) → Query Engine → Storage Engine → Results
@@ -31,6 +31,12 @@ SQL Query  → SQL Parser (library) → Query Engine → Storage Engine → Resu
 - Learning C++ through this project
 - Developing in Neovim inside WSL on Windows
 
+## Learning Approach
+See `resources/syllabus.pdf` for the structured learning plan. Key principle: **code first, read second**. For each unit:
+1. **TRY IT THE NAIVE WAY** — attempt with what you already know, discover why it fails
+2. **NOW LEARN THE REAL SOLUTION** — read the assigned materials with a specific problem to solve
+3. **BUILD IT** — implement the solution with hands-on understanding
+
 ## How to assist
 **Do not generate code.** This project is a learning exercise and the developer writes all code themselves.
 
@@ -44,14 +50,31 @@ Instead, assist by:
 
 When reviewing developer-written code, give honest feedback on correctness and idiomatic C++ — explain the reasoning, don't rewrite it.
 
-## Roadmap
-1. **Validator** — file extension, encoding, empty check, header validation
-2. **Parser** — byte-by-byte CSV parsing with quoting/escaping support
-3. **Storage engine** — structured .db file format, page layout, write parsed rows to disk
-4. **Query engine** — execute parsed SQL ASTs: table scans, index lookups, joins, aggregation
-5. **Indexing** — B-trees for fast lookups
-6. **CLI interface** — test everything locally before adding networking
-7. **Web service** — HTTP server, file upload, query console, multi-user
+## Roadmap (Phases from Syllabus)
+**Phase 0: The Foundation** — CSV ingestion and C++ basics
+1. **Validator** (Unit 0) — file extension, encoding, empty check, header validation ✅ Done
+2. **Parser** (Unit 0) — byte-by-byte CSV parsing with quoting/escaping support ✅ Done
+
+**Phase 1: Storage** — How data lives on disk
+3. **Storage engine** (Units 1–3) — pages, buffer pools, compression, .db file format
+
+**Phase 2: Indexing** — Finding data fast
+4. **B-tree indexes** (Units 4–5) — fast lookups, range queries, concurrency
+
+**Phase 3: Query Execution** — Running queries
+5. **Sort, join, aggregate** (Units 6–8) — external merge sort, join algorithms, iterator model
+
+**Phase 4: SQL Parsing & Optimization** — From text to plan
+6. **SQL parser** (Unit 9) — tokenization, AST, recursive descent parsing
+7. **Query optimizer** (Unit 10) — cost estimation, join ordering, equivalence rules
+
+**Phase 5: Transactions & Recovery** — Making it bulletproof
+8. **Concurrency control** (Unit 11) — 2PL, MVCC, conflict serialization
+9. **Crash recovery** (Unit 12) — write-ahead logging, ARIES algorithm
+
+**Phase 6: Web service** — User-facing layer
+10. **CLI interface** — test everything locally before adding networking
+11. **HTTP server, file upload, query console** — multi-user access
 
 ## Performance benchmarking
 The 1 Billion Row Challenge (1BRC) will be used as a performance benchmark. Target data domain: public county/local demographics and election data. Later stages will explore mmap, multithreading, and SIMD.

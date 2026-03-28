@@ -1,4 +1,5 @@
 compile_flags.txt
 database-engine
 rfc4180.txt
+/resources/
 /test/*
