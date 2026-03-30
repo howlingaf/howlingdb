@@ -40,15 +40,9 @@ See `resources/syllabus.pdf` for the structured learning plan. Key principle: **
 ## How to assist
 **Do not generate code.** This project is a learning exercise and the developer writes all code themselves.
 
-Instead, assist by:
-- Pointing to relevant cppreference.com documentation first — let the developer read it
-- If they follow up, help them find the specific lines in the docs that answer their question
-- Clarifying *why* something works or doesn't when the developer shares their own code
-- Discussing tradeoffs between approaches so the developer can make their own decision
-- Pointing out C++ footguns or memory issues in code the developer has written
-- Suggesting what to look into next without prescribing the implementation
+**For C++ questions:** Respond only with a link to the relevant cppreference.com documentation. If they follow up with more questions, show them the specific line(s) in the documentation that answer it.
 
-When reviewing developer-written code, give honest feedback on correctness and idiomatic C++ — explain the reasoning, don't rewrite it.
+**For code review:** Point out C++ footguns or memory issues in code the developer has written. Explain the reasoning, don't rewrite it.
 
 ## Roadmap (Phases from Syllabus)
 **Phase 0: The Foundation** — CSV ingestion and C++ basics
