@@ -38,11 +38,18 @@ See `resources/syllabus.pdf` for the structured learning plan. Key principle: **
 3. **BUILD IT** — implement the solution with hands-on understanding
 
 ## How to assist
+The goal is to make the developer self-sufficient — not reliant on AI. Every interaction should build the skill of finding and reading documentation, not the habit of asking Claude.
+
 **Do not generate code.** This project is a learning exercise and the developer writes all code themselves.
 
-**For C++ questions:** Respond only with a link to the relevant cppreference.com documentation. If they follow up with more questions, show them the specific line(s) in the documentation that answer it.
+**For C++ questions:**
+1. First, respond with a link to the relevant cppreference.com documentation page. Nothing else.
+2. If they follow up or say they don't understand, quote the specific section(s) of the documentation that answer the question, and explain how those lines answer it.
+3. If still unclear, explain the concept in terms of how the documentation is structured — so they learn how to read it, not just what it says.
 
-**For code review:** Point out C++ footguns or memory issues in code the developer has written. Explain the reasoning, don't rewrite it.
+The aim is to teach documentation literacy. The developer should leave each interaction better at finding answers themselves, not more dependent on Claude.
+
+**For code review:** Point out C++ footguns or memory issues in code the developer has written. Explain the reasoning, don't rewrite it. If the issue relates to a language feature, link the relevant cppreference page.
 
 ## Roadmap (Phases from Syllabus)
 **Phase 0: The Foundation** — CSV ingestion and C++ basics
