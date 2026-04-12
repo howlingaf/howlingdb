@@ -1,11 +1,14 @@
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
+
+#include "Page.hpp"
 
 struct Valid {};
 
@@ -86,15 +89,16 @@ struct ParseResult {
 
 ParseResult parse(std::ifstream &csv); // return Success or HasUnresolved
 
-// push to db if row is valid,
 ParseResult parse(std::ifstream &reader) {
   int success_count;
   int failure_count;
   int runtime;
   std::cout << "Initiating parsing" << std::endl;
   bool IN_VALUE = false;
+  std::vector<std::string> headers;
   std::vector<std::string> row;
   uint64_t count = 0;
+  Schema schema;
   std::stringstream value;
   while (!reader.eof()) {
     char curr = reader.get();
@@ -128,11 +132,14 @@ ParseResult parse(std::ifstream &reader) {
       row.push_back(value.str());
       value = std::stringstream();
       if (count == 0) {
-        Schema create_schema(std::vector<std::string> * row);
-        // schema == array of columns(we know the length)
-        // columns and their types can be defined from first row
+        headers = row;
       } else {
-        serialize(std::vector<std::string> * row);
+        if (!headers.empty()) {
+          // TODO: write schema to data key page
+          schema = create_schema(headers, row);
+          headers.clear();
+        }
+        Record record = serialize(row, schema);
       }
       for (auto &i : row) {
         std::cout << i + "|";

@@ -1,109 +1,180 @@
-#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
+#include <stdexcept>
 #include <string>
-#include <variant>
 #include <vector>
 
-// 128b
-struct Header {
-  uint32_t record_count;
-  uint32_t free_space_size;
-  uint32_t free_space_offset;
-  uint32_t block_header_offset;
-};
-
-// 4byte
-struct Slot {
-  uint64_t offset;
-  uint64_t length;
-};
-
 struct Record {
-  uint64_t *data;
-  uint16_t size;
+  std::unique_ptr<uint8_t[]> data;
+  uint16_t bytes;
 };
 
-class Page {
+struct Page {
+  static constexpr uint16_t PAGE_SIZE = 4096;
+  uint8_t page[PAGE_SIZE];
 
-  static constexpr uint32_t PAGE_SIZE = 4096;
+  static constexpr uint16_t ENTRIESp = 0;
+  static constexpr uint16_t FREE_SPACE_ENDp = 2;
 
-  using PageData = std::variant<std::monostate, Header, Slot, Record>;
-
-  std::array<PageData, PAGE_SIZE> buffer;
-  PageData &operator[](size_t index) { return buffer[index]; }
+  static constexpr uint16_t OFFSET_BYTES = 2;
+  static constexpr uint16_t LENGTH_BYTES = 2;
 
   Page() {
-    Header page_header = {.record_count = 0,
-                          .free_space_size = PAGE_SIZE,
-                          .free_space_offset = PAGE_SIZE,
-                          .block_header_offset = 0};
-    buffer[page_header.block_header_offset] = page_header;
-    page_header.block_header_offset += sizeof(Header);
-    page_header.free_space_size -= sizeof(Header);
-  };
-
-  int insert_record(const uint8_t *data) {
-
-    Header &header = get_header();
-
-    Slot slot = {.offset = header.block_header_offset, .length = sizeof(Slot)};
-
-    buffer[header.block_header_offset] = slot;
-    header.block_header_offset += slot.length;
-    header.free_space_size -= slot.length;
-
-    // TODO: unpack data into records, iterate
-    buffer[header.free_space_offset - sizeof(record)] = record;
-    header.free_space_offset -= sizeof(record);
-    // page_header.free_space_size -= sizeof(record);
-
-    return 0;
+    std::memcpy(&page, &ENTRIESp, sizeof(ENTRIESp));
+    std::memcpy(&page[FREE_SPACE_ENDp], &PAGE_SIZE, sizeof(FREE_SPACE_ENDp));
   }
 
-  Header &get_header() { return std::get<Header>(buffer[0]); }
-};
+  int insert_record(const Record record) {
 
-Record serialize(const std::vector<std::string> &row) {
-  Record record = Record{};
-  uint16_t size_of_items = 0;
-  for (auto it = row.begin(); it != row.end(); ++it) {
-    size_of_items += sizeof(*it);
+    uint8_t record_insertp = free_space_endp() - record.bytes;
+    std::memcpy(&page[record_insertp], record.data.get(), record.bytes);
+    std::memcpy(&page[FREE_SPACE_ENDp], &record_insertp,
+                sizeof(FREE_SPACE_ENDp));
+    std::memcpy(&page[ENTRIESp], &page[ENTRIESp] + 1, sizeof(ENTRIESp));
+
+    uint16_t offsetp = header_bytes() + slot_bytes();
+    uint16_t lengthp = offsetp + sizeof(LENGTH_BYTES);
+    std::memcpy(&page[offsetp], &record_insertp, sizeof(offsetp));
+    std::memcpy(&page[lengthp], &record.bytes, sizeof(lengthp));
   }
-  uint64_t total_record_size = size_of_items + row.size() * sizeof(Slot) + 8;
 
-  uint64_t total_bits = static_cast<uint32_t>(std::ceil(row.size() / 8));
-  uint64_t bitmap = 0;
-
-  for (auto it = row.begin(); it != row.end(); ++it) {
-    bitmap <<= 1;
-    bitmap |= (it->empty() & 1);
+  uint16_t free_bytes() {
+    return free_space_endp() - header_bytes() - slot_bytes();
   }
-  bitmap <<= (total_bits - row.size());
 
-  struct Bitmap {
-    uint64_t data;
-  };
+private:
+  uint16_t entry_count() {
+    uint16_t entries;
+    std::memcpy(&entries, &page[ENTRIESp], sizeof(ENTRIESp));
+    return entries;
+  }
 
-  struct Field {
-    uint64_t *data; // data could be pointing at any data type
-  };
+private:
+  uint16_t free_space_endp() {
+    uint16_t free_space_end;
+    std::memcpy(&free_space_end, &page[FREE_SPACE_ENDp],
+                sizeof(FREE_SPACE_ENDp));
+    return free_space_end;
+  }
 
-  using RecordData = std::variant<std::monostate, Bitmap, Slot, Field>;
-  RecordData *buf = new RecordData[total_record_size];
-  buf[0] = Bitmap{.data = bitmap};
-  uint64_t slot_pos = 1;
-  uint64_t record_pos_offset = 64 * slot_pos + sizeof(Slot) * row.size();
-  uint64_t slot_padding = 64 - (record_pos_offset % 64) + record_pos_offset;
-  record_pos_offset += slot_padding;
-  uint64_t record_pos = record_pos_offset % 64;
-  string, char[], iterate all if isdigit is false ? uint64_t, int use stoi;
-  (how to parse out float from string),
-      float use stof for (auto it = row.begin(); it != row.end(); ++it) {
-    buf[slot_pos] = Slot{.offset = slot_pos, .length = it->size()};
-    buf[record_pos] = Field{.data = *it};
+private:
+  uint16_t header_bytes() { return sizeof(ENTRIESp) + sizeof(FREE_SPACE_ENDp); }
+
+private:
+  uint16_t slot_bytes() {
+    return entry_count() * (sizeof(OFFSET_BYTES) + sizeof(LENGTH_BYTES));
   }
 };
+
+enum ColumnType { INT, FLOAT, VARCHAR };
+
+struct Column {
+  std::string name;
+  ColumnType type;
+};
+
+struct Schema {
+  std::vector<Column> columns;
+};
+
+Schema create_schema(std::vector<std::string> &keys,
+                     std::vector<std::string> &first_row) {
+
+  Schema schema;
+  for (auto i = 0; i < keys.size(); i++) {
+    try {
+      std::stoi(first_row[i]);
+      Column column;
+      column.type = INT;
+      column.name = first_row[i];
+      schema.columns.push_back(column);
+    } catch (...) {
+      try {
+        std::stof(first_row[i]);
+        Column column;
+        column.type = FLOAT;
+        column.name = first_row[i];
+        schema.columns.push_back(column);
+      } catch (...) {
+        Column column;
+        column.type = VARCHAR;
+        column.name = first_row[i];
+        schema.columns.push_back(column);
+      }
+    }
+  }
+  return schema;
+}
+
+Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
+  uint16_t bitmap_bytes = (schema.columns.size() + 7) / 8;
+  uint8_t *bitmap = new uint8_t[bitmap_bytes]();
+
+  uint16_t total_bytes = 0;
+  uint8_t fixed_pos = 0;
+  uint8_t var_pos = bitmap_bytes;
+
+  for (size_t i = 0; i < schema.columns.size(); ++i) {
+    switch (schema.columns[i].type) {
+    case INT:
+      total_bytes += 4;
+      var_pos += 4;
+      break;
+    case FLOAT:
+      total_bytes += 8;
+      var_pos += 8;
+      break;
+    case VARCHAR:
+      total_bytes += 4;
+      var_pos += 4;
+      total_bytes += fields[i].size();
+      break;
+    default:
+      throw std::runtime_error("Unknown column type found");
+    }
+  }
+
+  auto buf = std::make_unique<uint8_t[]>(total_bytes);
+  uint8_t *write_ptr = buf.get();
+
+  for (size_t i = 0; i < fields.size(); ++i) {
+    if (fields[i].empty()) {
+      bitmap[i / 8] |= 1 << (7 - (i % 8));
+      continue;
+    }
+    switch (schema.columns[i].type) {
+    case INT: {
+      int int_val = std::stoi(fields[i]);
+      std::memcpy(&buf[fixed_pos], &int_val, 4);
+      fixed_pos += 4;
+      break;
+    }
+    case FLOAT: {
+      float fl_val = std::stof(fields[i]);
+      std::memcpy(&buf[fixed_pos], &fl_val, 8);
+      fixed_pos += 8;
+      break;
+    }
+    case VARCHAR: {
+      uint16_t offset = var_pos;
+      uint16_t length = fields[i].size();
+      std::memcpy(&buf[fixed_pos], &offset, 2);
+      fixed_pos += 2;
+      std::memcpy(&buf[fixed_pos], &length, 2);
+      fixed_pos += 2;
+      std::memcpy(&buf[var_pos], &fields[i], length);
+      var_pos += length;
+      break;
+    }
+    default:
+      throw std::runtime_error("Unknown column type found");
+    }
+  }
+
+  // need to move buf to record
+  return Record{buf, total_bytes};
+}
