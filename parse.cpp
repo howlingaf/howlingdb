@@ -9,6 +9,8 @@
 #include <vector>
 
 #include "Page.hpp"
+#include "schema.hpp"
+#include "serialize.hpp"
 
 struct Valid {};
 
@@ -135,7 +137,6 @@ ParseResult parse(std::ifstream &reader) {
         headers = row;
       } else {
         if (!headers.empty()) {
-          // TODO: write schema to data key page
           schema = create_schema(headers, row);
           headers.clear();
         }
