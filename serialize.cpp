@@ -12,7 +12,7 @@
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   uint16_t bitmap_bytes = (schema.columns.size() + 7) / 8;
-  uint8_t *bitmap = new uint8_t[bitmap_bytes]();
+  std::vector<uint16_t> bitmap(bitmap_bytes, 0);
   uint16_t total_bytes = 0;
   uint8_t fixed_pos = 0;
   uint8_t var_pos = bitmap_bytes;
@@ -20,16 +20,12 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   for (size_t i = 0; i < schema.columns.size(); ++i) {
     switch (schema.columns[i].type) {
     case INT:
-      total_bytes += 4;
-      var_pos += 4;
+      total_bytes += sizeof(int);
       break;
     case FLOAT:
-      total_bytes += 8;
-      var_pos += 8;
+      total_bytes += sizeof(float);
       break;
     case VARCHAR:
-      total_bytes += 4;
-      var_pos += 4;
       total_bytes += fields[i].size();
       break;
     default:
@@ -39,7 +35,7 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   auto buf = std::make_unique<uint8_t[]>(total_bytes);
   uint8_t *write_ptr = buf.get();
 
-  for (size_t i = 0; i < fields.size(); ++i) {
+  for (uint8_t i = 0; i < fields.size(); ++i) {
     if (fields[i].empty()) {
       bitmap[i / 8] |= 1 << (7 - (i % 8));
       continue;
@@ -52,9 +48,9 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
       break;
     }
     case FLOAT: {
-      float fl_val = std::stof(fields[i]);
-      std::memcpy(&buf[fixed_pos], &fl_val, 8);
-      fixed_pos += 8;
+      double fl_val = std::stof(fields[i]);
+      std::memcpy(&buf[fixed_pos], &fl_val, 4);
+      fixed_pos += 4;
       break;
     }
     case VARCHAR: {
@@ -64,7 +60,7 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
       fixed_pos += 2;
       std::memcpy(&buf[fixed_pos], &length, 2);
       fixed_pos += 2;
-      std::memcpy(&buf[var_pos], &fields[i], length);
+      std::memcpy(&buf[var_pos], fields[i].data(), length);
       var_pos += length;
       break;
     }

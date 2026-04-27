@@ -1,18 +1,22 @@
+#include <chrono>
+#include <format> // Requires C++20
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 
-#include "parse.cpp"
+#include "parse.hpp"
 
 std::unordered_map<int, std::string> error_code_to_message = {
     {1, "Invalid Csv."},
 };
 
-std::string PATH_TO_CSV = "./test/customers-10000.csv";
+std::string PATH_TO_CSV = "./example.csv";
 
 int main() {
+  auto now = std::chrono::system_clock::now();
+  std::cout << std::format("{:%F %T}", now) << std::endl;
   std::ifstream file(PATH_TO_CSV);
 
   if (!file.is_open()) {
@@ -22,6 +26,7 @@ int main() {
   ValidatorResult is_valid = is_csv_valid(file);
   if (std::holds_alternative<Valid>(is_valid)) {
     std::cout << "Csv is valid" << std::endl;
+
     ParseResult parse_result = parse(file);
   }
 

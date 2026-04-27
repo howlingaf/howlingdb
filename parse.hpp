@@ -1,8 +1,10 @@
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <printf.h>
 #include <sstream>
 #include <string>
 #include <variant>
@@ -19,6 +21,7 @@ struct Invalid {
   int error_row;
   int error_col;
 };
+
 using ValidatorResult = std::variant<Valid, Invalid>;
 
 ValidatorResult is_csv_valid(std::ifstream &reader) {
@@ -91,6 +94,13 @@ struct ParseResult {
 
 ParseResult parse(std::ifstream &csv); // return Success or HasUnresolved
 
+void print_row(const std::vector<std::string> &row) {
+  for (size_t i = 0; i < row.size(); i++) {
+    std::cout << i << row.at(i) + "|";
+  }
+  std::cout << std::endl;
+};
+
 ParseResult parse(std::ifstream &reader) {
   int success_count;
   int failure_count;
@@ -99,14 +109,16 @@ ParseResult parse(std::ifstream &reader) {
   bool IN_VALUE = false;
   std::vector<std::string> headers;
   std::vector<std::string> row;
-  uint64_t count = 0;
+  uint64_t count = -1;
   Schema schema;
   std::stringstream value;
+  Page page;
   while (!reader.eof()) {
     char curr = reader.get();
     if (curr == '"') {
       if (!IN_VALUE) {
-        if (reader.tellg() == 0) {
+        auto pos = reader.tellg();
+        if (pos == 1) {
           printf("%d\n", (int)reader.tellg());
           IN_VALUE = true;
         } else {
@@ -133,20 +145,18 @@ ParseResult parse(std::ifstream &reader) {
     } else if (curr == '\n' && !IN_VALUE) {
       row.push_back(value.str());
       value = std::stringstream();
-      if (count == 0) {
+      if (count == -1) {
         headers = row;
       } else {
         if (!headers.empty()) {
           schema = create_schema(headers, row);
           headers.clear();
         }
-        Record record = serialize(row, schema);
+        const Record record = serialize(row, schema);
+        page.insert_record(record);
+        std::cout << "inserted" << std::endl;
       }
-      for (auto &i : row) {
-        std::cout << i + "|";
-      }
-      std::cout << std::endl;
-      // write to page
+      count++;
       row.clear();
     } else {
       value << curr;

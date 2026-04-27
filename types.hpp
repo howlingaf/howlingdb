@@ -13,6 +13,7 @@ struct Column {
 struct Record {
   std::unique_ptr<uint8_t[]> data;
   uint16_t bytes;
+  uint16_t id;
 };
 
 struct Schema {
