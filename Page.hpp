@@ -1,8 +1,6 @@
 #pragma once
 
 #include "types.hpp"
-#include <cctype>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -10,18 +8,18 @@
 
 struct Page {
   static constexpr uint16_t PAGE_SIZE = 4096;
-  uint8_t page[PAGE_SIZE];
-
   static constexpr uint16_t ENTRIESp = 0;
   static constexpr uint16_t FREE_SPACE_ENDp = 2;
-  static constexpr uint16_t ENTRY_START = 4;
+  static constexpr uint16_t SLOT_START = 4;
 
-  static constexpr uint16_t OFFSET_BYTES = 2;
-  static constexpr uint16_t LENGTH_BYTES = 2;
+  using offset_t = uint16_t;
+  using length_t = uint16_t;
+
+  uint8_t page[PAGE_SIZE];
 
   Page() {
     std::memcpy(&page, &ENTRIESp, sizeof(ENTRIESp));
-    std::memcpy(&page[FREE_SPACE_ENDp], &PAGE_SIZE, sizeof(FREE_SPACE_ENDp));
+    std::memcpy(&page[FREE_SPACE_ENDp], &PAGE_SIZE, sizeof(PAGE_SIZE));
   }
 
   uint8_t insert_record(const Record &record) {
@@ -33,20 +31,20 @@ struct Page {
     std::memcpy(&page[record_insertp], record.data.get(), record.bytes);
     std::memcpy(&page[FREE_SPACE_ENDp], &record_insertp,
                 sizeof(FREE_SPACE_ENDp));
-    std::memcpy(&page[ENTRIESp], &page[ENTRIESp] + 1, sizeof(ENTRIESp));
+    uint16_t count = entry_count();
+    std::memcpy(&page[ENTRIESp], &(++count), sizeof count);
 
     uint16_t offsetp = header_bytes() + slot_bytes();
-    uint16_t lengthp = offsetp + sizeof(LENGTH_BYTES);
+    uint16_t lengthp = offsetp + sizeof(length_t);
     std::memcpy(&page[offsetp], &record_insertp, sizeof(offsetp));
     std::memcpy(&page[lengthp], &record.bytes, sizeof(lengthp));
-    print_page();
     return 0;
   }
 
   uint8_t delete_record(const uint16_t id) {
     uint8_t items = *page;
-    for (size_t i = ENTRY_START;
-         i < entry_count() * (OFFSET_BYTES + LENGTH_BYTES); i = i + 4) {
+    for (size_t i = SLOT_START;
+         i < entry_count() * sizeof(offset_t) + sizeof(length_t); i = i + 4) {
     }
 
     return 0;
@@ -71,11 +69,6 @@ private:
   }
   uint16_t header_bytes() { return sizeof(ENTRIESp) + sizeof(FREE_SPACE_ENDp); }
   uint16_t slot_bytes() {
-    return entry_count() * (sizeof(OFFSET_BYTES) + sizeof(LENGTH_BYTES));
-  }
-  void print_page() {
-    uint8_t *p = page;
-    std::cout << "Entry count" << &p << std::endl;
-    delete p;
+    return entry_count() * (sizeof(offset_t) + sizeof(length_t));
   }
 };

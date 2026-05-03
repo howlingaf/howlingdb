@@ -113,13 +113,14 @@ ParseResult parse(std::ifstream &reader) {
   Schema schema;
   std::stringstream value;
   Page page;
+  bool field_start = true;
   while (!reader.eof()) {
     char curr = reader.get();
     if (curr == '"') {
       if (!IN_VALUE) {
         auto pos = reader.tellg();
-        if (pos == 1) {
-          printf("%d\n", (int)reader.tellg());
+        if (field_start) {
+          field_start = false;
           IN_VALUE = true;
         } else {
           value << curr;
@@ -154,10 +155,10 @@ ParseResult parse(std::ifstream &reader) {
         }
         const Record record = serialize(row, schema);
         page.insert_record(record);
-        std::cout << "inserted" << std::endl;
       }
       count++;
       row.clear();
+      field_start = true;
     } else {
       value << curr;
     }

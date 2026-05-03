@@ -3,15 +3,17 @@
 #include <string>
 #include <system_error>
 #include <vector>
+
+// note this assumes the first row is a reliable source to extrapolate
 Schema create_schema(std::vector<std::string> &keys,
                      std::vector<std::string> &first_row) {
 
   Schema schema;
-  for (auto i = 0; i < keys.size(); i++) {
+  for (size_t i = 0; i < keys.size(); i++) {
     Column col;
     int result_int{};
     float result_float{};
-    auto curr = first_row.at(i);
+    const auto &curr = first_row[i];
     auto start = curr.data();
     auto end = curr.data() + curr.size();
 

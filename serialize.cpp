@@ -1,8 +1,7 @@
-#include <cctype>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -34,12 +33,14 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   }
   auto buf = std::make_unique<uint8_t[]>(total_bytes);
   uint8_t *write_ptr = buf.get();
-
   for (uint8_t i = 0; i < fields.size(); ++i) {
+
     if (fields[i].empty()) {
       bitmap[i / 8] |= 1 << (7 - (i % 8));
       continue;
     }
+    std::cout << fields[i] << " ";
+    ;
     switch (schema.columns[i].type) {
     case INT: {
       int int_val = std::stoi(fields[i]);
@@ -49,8 +50,8 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
     }
     case FLOAT: {
       double fl_val = std::stof(fields[i]);
-      std::memcpy(&buf[fixed_pos], &fl_val, 4);
-      fixed_pos += 4;
+      std::memcpy(&buf[fixed_pos], &fl_val, 8);
+      fixed_pos += 8;
       break;
     }
     case VARCHAR: {
@@ -68,5 +69,6 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
       throw std::runtime_error("Unknown column type found");
     }
   }
+  std::cout << std::endl;
   return Record{std::move(buf), total_bytes};
 }
