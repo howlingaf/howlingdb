@@ -6,7 +6,11 @@
 #include <string>
 #include <unordered_map>
 
-#include "parse.hpp"
+#include "DiskManager.hpp"
+#include "Ingest.hpp"
+#include "PageManager.hpp"
+
+#include "types.hpp"
 
 std::unordered_map<int, std::string> error_code_to_message = {
     {1, "Invalid Csv."},
@@ -22,12 +26,13 @@ int main() {
   if (!file.is_open()) {
     throw std::runtime_error{"File could not be opened"};
   };
-
-  ValidatorResult is_valid = is_csv_valid(file);
+  DiskManager disk_manager;
+  PageManager page_manager(disk_manager);
+  Ingest ingest(page_manager);
+  ValidatorResult is_valid = validate(file);
   if (std::holds_alternative<Valid>(is_valid)) {
     std::cout << "Csv is valid" << std::endl;
-
-    ParseResult parse_result = parse(file);
+    IngestResult result = ingest.parse(file);
   }
 
   else if (std::holds_alternative<Invalid>(is_valid)) {

@@ -4,7 +4,7 @@
 #include <system_error>
 #include <vector>
 
-// note this assumes the first row is a reliable source to extrapolate
+// assumes the first row is a reliable source to extrapolate
 Schema create_schema(std::vector<std::string> &keys,
                      std::vector<std::string> &first_row) {
 

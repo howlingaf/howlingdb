@@ -1,6 +1,9 @@
 #pragma once
-//
-// class DiskManager {
-//   std::vector<Page> pages; // TODO: use array
-//   uint32_t current_page_index = 0;
-// };
+
+#include "types.hpp"
+#include <vector>
+
+struct DiskManager {
+  std::vector<Page> page;
+  void write();
+};
