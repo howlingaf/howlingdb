@@ -8,17 +8,7 @@ High-performance CSV ingestion engine written in C++.
 
 ## Overview
 
-A database engine built from scratch, focusing on efficient CSV ingestion and low-level disk management. The project explores core database internals: page-based storage, disk management, record serialization, and buffer management.
-
-## Build
-
-```bash
-clang++ -std=c++17 main.cpp -o dbms
-```
-
-## Progress
-
-Development is tracked on the [project board](https://github.com/users/howlingfantods-dev/projects/1).
+A database management system built from scratch
 
 ---
 
