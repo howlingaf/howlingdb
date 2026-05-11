@@ -26,9 +26,12 @@ int main() {
   if (!file.is_open()) {
     throw std::runtime_error{"File could not be opened"};
   };
+
   DiskManager disk_manager;
+  BufferManager buffer_manager;
   PageManager page_manager(disk_manager);
   Ingest ingest(page_manager);
+
   ValidatorResult is_valid = validate(file);
   if (std::holds_alternative<Valid>(is_valid)) {
     std::cout << "Csv is valid" << std::endl;

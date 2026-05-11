@@ -14,9 +14,10 @@ using length_t = uint16_t;
 struct PageManager {
 
   DiskManager disk_manager;
-  Page page;
+  Page page = 1;
 
-  PageManager(DiskManager disk_manager) {};
+  PageManager(DiskManager &dm) : disk_manager(dm) {}
+
   uint8_t insert(const Record &record) {
     if (free_bytes() < record.bytes) {
       std::cout << "Not enough space!/n";
@@ -35,17 +36,19 @@ struct PageManager {
 
     uint16_t offsetp = header_bytes() + slot_bytes();
     uint16_t lengthp = offsetp + sizeof(length_t);
-    std::memcpy(&page.data[offsetp], &record_insertp, sizeof(offsetp));
-    std::memcpy(&page.data[lengthp], &record.bytes, sizeof(lengthp));
+    std::memcpy(&page.data[offsetp], &record_insertp, sizeof(offset_t));
+    std::memcpy(&page.data[lengthp], &record.bytes, sizeof(length_t));
     return 0;
   }
+
+  uint8_t remove(uint32_t page_id, uint32_t rowid) { return 0; }
 
   uint16_t free_bytes() {
     return free_space_endp() - header_bytes() - slot_bytes();
   }
   uint16_t entry_count() {
     uint16_t entries;
-    std::memcpy(&entries, &page.data[ENTRIESp], sizeof(ENTRIESp));
+    std::memcpy(&entries, &page.data[ENTRIESp], sizeof(entries));
     return entries;
   }
   uint16_t free_space_endp() {

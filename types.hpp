@@ -53,9 +53,11 @@ struct Record {
 Record serialize(const std::vector<std::string> &fields, const Schema &schema);
 
 struct Page {
+  uint64_t id;
   std::array<uint8_t, PAGE_SIZE> data;
-  Page() {
+  Page(uint64_t id) {
     std::memcpy(&data, &ENTRIESp, sizeof(ENTRIESp));
     std::memcpy(&data[FREE_SPACE_ENDp], &PAGE_SIZE, sizeof(PAGE_SIZE));
+    id = id;
   };
 };

@@ -27,7 +27,7 @@ struct Ingest {
     uint64_t count = -1;
     Schema schema;
     std::stringstream value;
-    Page page;
+    Page page(page_manager.page);
     bool field_start = true;
     while (!reader.eof()) {
       char curr = reader.get();
