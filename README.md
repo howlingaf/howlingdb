@@ -1,15 +1,10 @@
 # DBMS
 
-High-performance CSV ingestion engine written in C++.
-
-> **Project board:** [View Kanban →](https://github.com/users/howlingfantods-dev/projects/1)
-
----
-
 ## Overview
 
 A database management system built from scratch
 
+> **Project board:** [View Kanban →](https://github.com/users/howlingfantods-dev/projects/1)
 ---
 
 ## Core Materials
