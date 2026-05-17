@@ -1,19 +1,14 @@
-# DBMS
-
-## Overview
+# Overview
 
 A database management system built from scratch
 
-> **Project board:** [View Kanban →](https://github.com/users/howlingfantods-dev/projects/1)
----
+**Project board:** [View Kanban →](https://github.com/users/howlingfantods-dev/projects/1)
 
-## Core Materials
 
-| | Resource |
-|---|---|
-| **Textbook** | [Database System Concepts, 7th Ed](https://db-book.com) — Silberschatz, Korth, Sudarshan |
-| **Lecture Notes** | [CMU 15-445 Fall 2024](https://15445.courses.cs.cmu.edu/fall2024/schedule.html) — Andy Pavlo |
-| **Build Guide** | [Build Your Own Database From Scratch](https://build-your-own.org/database/) |
-| **Parser Reference** | [Crafting Interpreters](https://craftinginterpreters.com) — Bob Nystrom |
-| **SQLite Reference** | [SQLite File Format Spec](https://www.sqlite.org/fileformat.html) \| [Query Planner](https://www.sqlite.org/optoverview.html) |
-
+<table>
+<tr><td><b>Textbook</b></td><td><a href="https://db-book.com">Database System Concepts, 7th Ed</a> — Silberschatz, Korth, Sudarshan</td></tr>
+<tr><td><b>Lecture Notes</b></td><td><a href="https://15445.courses.cs.cmu.edu/fall2024/schedule.html">CMU 15-445 Fall 2024</a> — Andy Pavlo</td></tr>
+<tr><td><b>Build Guide</b></td><td><a href="https://build-your-own.org/database/">Build Your Own Database From Scratch</a></td></tr>
+<tr><td><b>Parser Reference</b></td><td><a href="https://craftinginterpreters.com">Crafting Interpreters</a> — Bob Nystrom</td></tr>
+<tr><td><b>SQLite Reference</b></td><td><a href="https://www.sqlite.org/fileformat.html">SQLite File Format Spec</a> | <a href="https://www.sqlite.org/optoverview.html">Query Planner</a></td></tr>
+</table>
