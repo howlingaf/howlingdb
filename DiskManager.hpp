@@ -1,12 +1,26 @@
 #pragma once
 
-#include "types.hpp"
+#include <format>
 #include <fstream>
-#include <vector>
+#include <iostream>
+
+#include "Page.hpp"
 
 struct DiskManager {
-  // std::ifstream database;
-  // Page seekp(page_id *PAGE_SIZE); // jump to the right offset
-  // void write(reinterpret_cast<char *>(page.data),
-  //            PAGE_SIZE); // write 4096 bytes
+
+  int write(Page page) {
+    auto table = std::format("{}-page", page.id);
+    std::ofstream out(table, std::ios::binary);
+    out.write(reinterpret_cast<const char *>(page.data.data()),
+              page.data.size());
+    return 0;
+  };
+
+  Page fetch(uint8_t id) {
+    Page page = Page(id);
+    auto table = std::format("{}-page", id);
+    std::ifstream in(table, std::ios::binary);
+    in.read(reinterpret_cast<char *>(page.data.data()), page.data.size());
+    return page;
+  };
 };

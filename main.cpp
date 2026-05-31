@@ -6,9 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "BufferManager.hpp"
 #include "DiskManager.hpp"
-#include "Ingest.hpp"
-#include "PageManager.hpp"
 
 #include "types.hpp"
 
@@ -29,13 +28,10 @@ int main() {
 
   DiskManager disk_manager;
   BufferManager buffer_manager;
-  PageManager page_manager(disk_manager);
-  Ingest ingest(page_manager);
-
   ValidatorResult is_valid = validate(file);
   if (std::holds_alternative<Valid>(is_valid)) {
     std::cout << "Csv is valid" << std::endl;
-    IngestResult result = ingest.parse(file);
+    buffer_manager.ingest(file);
   }
 
   else if (std::holds_alternative<Invalid>(is_valid)) {

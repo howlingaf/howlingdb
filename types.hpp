@@ -1,7 +1,5 @@
 #pragma once
 
-#include <array>
-#include <cstring>
 #include <memory>
 #include <stdint.h>
 #include <string>
@@ -18,6 +16,7 @@ inline constexpr uint16_t PAGE_SIZE = 4096;
 inline constexpr uint16_t ENTRIESp = 0;
 inline constexpr uint16_t FREE_SPACE_ENDp = 2;
 inline constexpr uint16_t SLOT_START = 4;
+inline constexpr uint8_t PAGE_LIMIT = 10;
 
 struct Valid {};
 
@@ -40,6 +39,7 @@ struct Column {
 
 struct Schema {
   std::vector<Column> columns;
+  uint8_t id;
 };
 
 Schema create_schema(std::vector<std::string> &keys,
@@ -47,17 +47,7 @@ Schema create_schema(std::vector<std::string> &keys,
 
 struct Record {
   std::unique_ptr<uint8_t[]> data;
-  uint32_t bytes;
+  uint32_t size;
 };
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema);
-
-struct Page {
-  uint64_t id;
-  std::array<uint8_t, PAGE_SIZE> data;
-  Page(uint64_t id) {
-    std::memcpy(&data, &ENTRIESp, sizeof(ENTRIESp));
-    std::memcpy(&data[FREE_SPACE_ENDp], &PAGE_SIZE, sizeof(PAGE_SIZE));
-    id = id;
-  };
-};
