@@ -3,3 +3,4 @@ dbms
 rfc4180.txt
 /resources/
 /test/*
+/db/*
