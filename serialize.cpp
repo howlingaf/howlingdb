@@ -69,8 +69,6 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
 
   uint8_t fixedp = 0;
   uint8_t varp = capacity - var_capacity;
-  uint8_t *bufp = buf.get();
-
   std::memcpy(&buf[bitmapp], &bytes, sizeof(bytes));
   for (uint8_t i = 0; i < fields.size(); ++i) {
     if (!fields[i].empty()) {
@@ -94,7 +92,7 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
     case VARCHAR: {
       uint16_t offset = varp;
       uint16_t length = fields[i].size();
-      std::memcpy(&buf[fixedp], &offset, sizeof(offset));
+      std::memcpy(&buf[fixedp], &offset, sizeof(length));
       fixedp += offset;
       std::memcpy(&buf[fixedp], &length, sizeof(length));
       fixedp += sizeof(length);
