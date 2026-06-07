@@ -4,6 +4,6 @@ while true;
 do
     echo "==============================================="
     make -j
-    ./dbms
+    ./howlingdb
     inotifywait -r . -e MODIFY -e MOVE
 done

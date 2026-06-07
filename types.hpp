@@ -1,22 +1,18 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <stdint.h>
 #include <string>
 #include <variant>
 #include <vector>
 
-enum State {
+enum State : int8_t {
   Success,
   PartialSuccess,
   Failure,
 };
 
-inline constexpr uint16_t PAGE_SIZE = 4096;
-inline constexpr uint16_t ENTRIESp = 0;
-inline constexpr uint16_t FREE_SPACE_ENDp = 2;
-inline constexpr uint16_t SLOT_START = 4;
-inline constexpr uint8_t PAGE_LIMIT = 10;
+constexpr uint8_t PAGE_LIMIT = 10;
 
 struct Valid {};
 
@@ -30,11 +26,11 @@ using ValidatorResult = std::variant<Valid, Invalid>;
 
 ValidatorResult validate(std::ifstream &reader);
 
-enum ColumnType { INT, FLOAT, VARCHAR };
+enum ColumnType : std::uint8_t { INT, FLOAT, VARCHAR };
 
 struct Column {
   std::string name;
-  ColumnType type;
+  uint8_t type;
 };
 
 struct Schema {
@@ -47,7 +43,7 @@ Schema create_schema(std::vector<std::string> &keys,
 
 struct Record {
   std::unique_ptr<uint8_t[]> data;
-  uint32_t size;
+  uint16_t size;
 };
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema);

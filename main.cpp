@@ -1,13 +1,12 @@
 #include <chrono>
-#include <format> // Requires C++20
+#include <format>
 #include <fstream>
 #include <iostream>
-#include <stdexcept>
+#include <print>
 #include <string>
 #include <unordered_map>
 
-#include "BufferManager.hpp"
-#include "DiskManager.hpp"
+#include "BufferPoolManager.hpp"
 
 #include "types.hpp"
 
@@ -19,25 +18,24 @@ std::string PATH_TO_CSV = "./example.csv";
 
 int main() {
   auto now = std::chrono::system_clock::now();
-  std::cout << std::format("{:%F %T}", now) << std::endl;
+  std::cout << std::format("{:%F %T}", now) << '\n';
   std::ifstream file(PATH_TO_CSV);
 
   if (!file.is_open()) {
-    throw std::runtime_error{"File could not be opened"};
+    return 1;
   };
 
-  DiskManager disk_manager;
-  BufferManager buffer_manager;
+  BufferPoolManager buffer_manager;
   ValidatorResult is_valid = validate(file);
   if (std::holds_alternative<Valid>(is_valid)) {
-    std::cout << "Csv is valid" << std::endl;
+    std::cout << "Csv is valid" << '\n';
     buffer_manager.ingest(file);
   }
 
-  else if (std::holds_alternative<Invalid>(is_valid)) {
-    printf("%s {row:%d,col:%d}", std::get<Invalid>(is_valid).reason.c_str(),
-           std::get<Invalid>(is_valid).error_row,
-           std::get<Invalid>(is_valid).error_row);
+  if (std::holds_alternative<Invalid>(is_valid)) {
+    std::print("{} {{row:{}, col:{}}}", std::get<Invalid>(is_valid).reason,
+               std::get<Invalid>(is_valid).error_row,
+               std::get<Invalid>(is_valid).error_col);
   }
 
   return 0;
