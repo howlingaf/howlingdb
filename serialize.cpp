@@ -1,3 +1,4 @@
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -7,13 +8,14 @@
 #include <string>
 #include <vector>
 
+#include "src/types/layout.hpp"
 #include "types.hpp"
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
 
-  uint8_t capacity = 0;
-  uint8_t fixed_capacity = 0;
-  uint8_t var_capacity = 0;
+  uint16_t capacity = 0;
+  uint16_t fixed_capacity = 0;
+  uint16_t var_capacity = 0;
 
   for (size_t i = 0; i < schema.columns.size(); ++i) {
 
@@ -24,7 +26,7 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
       break;
     case FLOAT:
       capacity += sizeof(float);
-      fixed_capacity += sizeof(int);
+      fixed_capacity += sizeof(float);
       break;
     case VARCHAR:
       capacity += fields[i].size();
@@ -60,44 +62,44 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   //   null).
   // ============================================================================
 
-  uint8_t bytes = (schema.columns.size() + 7) / 8;
+  const uint8_t ROUND_UP = 7;
+  uint8_t bytes = (schema.columns.size() + ROUND_UP) / CHAR_BIT;
 
   capacity += sizeof(bytes);
-  uint8_t bitmapp = fixed_capacity;
+  const uint8_t bitmap = fixed_capacity;
 
   auto buf = std::make_unique<uint8_t[]>(capacity);
 
-  uint8_t fixedp = 0;
-  uint8_t varp = capacity - var_capacity;
-  std::memcpy(&buf[bitmapp], &bytes, sizeof(bytes));
-  for (uint8_t i = 0; i < fields.size(); ++i) {
+  uint16_t fixed_offset = 0;
+  uint16_t var_offset = capacity - var_capacity;
+  std::memcpy(&buf[bitmap], &bytes, sizeof(bytes));
+  for (size_t i = 0; i < fields.size(); ++i) {
     if (!fields[i].empty()) {
-      buf[fixedp + (i / 8)] |= 1 << (7 - (i % 8));
+      buf[fixed_offset + (i / CHAR_BIT)] |= 1 << (ROUND_UP - (i % CHAR_BIT));
     }
 
     std::cout << fields[i] << " ";
     switch (schema.columns[i].type) {
     case INT: {
-      int int_val = std::stoi(fields[i]);
-      std::memcpy(&buf[fixedp], &int_val, sizeof(int_val));
-      fixedp += sizeof(int_val);
+      int val_as_int = std::stoi(fields[i]);
+      std::memcpy(&buf[fixed_offset], &val_as_int, sizeof(int));
+      fixed_offset += sizeof(int);
       break;
     }
     case FLOAT: {
-      double fl_val = std::stof(fields[i]);
-      std::memcpy(&buf[fixedp], &fl_val, sizeof(fl_val));
-      fixedp += sizeof(fl_val);
+      float val_as_float = std::stof(fields[i]);
+      std::memcpy(&buf[fixed_offset], &val_as_float, sizeof(float));
+      fixed_offset += sizeof(float);
       break;
     }
     case VARCHAR: {
-      uint16_t offset = varp;
-      uint16_t length = fields[i].size();
-      std::memcpy(&buf[fixedp], &offset, sizeof(length));
-      fixedp += offset;
-      std::memcpy(&buf[fixedp], &length, sizeof(length));
-      fixedp += sizeof(length);
-      std::memcpy(&buf[varp], fields[i].data(), length);
-      varp += length;
+      length_t length = fields[i].size();
+      std::memcpy(&buf[fixed_offset], &var_offset, sizeof(offset_t));
+      std::memcpy(&buf[fixed_offset + sizeof(offset_t)], &length,
+                  sizeof(length_t));
+      fixed_offset += (sizeof(offset_t) + sizeof(length_t));
+      std::memcpy(&buf[var_offset], fields[i].data(), length);
+      var_offset += length;
       break;
     }
     default:
@@ -105,6 +107,6 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
     }
   }
 
-  std::cout << std::endl;
-  return Record{std::move(buf), capacity};
+  std::cout << '\n';
+  return Record{.data = std::move(buf), .size = capacity};
 }
