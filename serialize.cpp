@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "src/types/layout.hpp"
-#include "src/util/bytes.hpp"
+#include "src/util/layout.hpp"
 #include "types.hpp"
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema) {

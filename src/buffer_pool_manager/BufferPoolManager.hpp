@@ -14,6 +14,7 @@ struct LRUCache {
 
   DiskManager disk_manager;
   std::vector<Page> pages;
+  // TODO: pin/unpin for concurrency
 
   Page &top() { return pages.back(); }
 
@@ -71,6 +72,8 @@ struct LRUCache {
 struct BufferPoolManager {
 
   LRUCache pool;
+
+  // TODO: checkout/release on pool
   Page curr_page;
   Schema schema;
 

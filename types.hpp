@@ -12,8 +12,6 @@ enum State : int8_t {
   Failure,
 };
 
-constexpr uint8_t PAGE_LIMIT = 10;
-
 struct Valid {};
 
 struct Invalid {
