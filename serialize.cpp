@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "src/types/layout.hpp"
+#include "src/util/bytes.hpp"
 #include "types.hpp"
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
@@ -63,16 +64,16 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   // ============================================================================
 
   const uint8_t ROUND_UP = 7;
-  uint8_t bytes = (schema.columns.size() + ROUND_UP) / CHAR_BIT;
+  const uint16_t bytes = (schema.columns.size() + ROUND_UP) / CHAR_BIT;
 
   capacity += sizeof(bytes);
   const uint8_t bitmap = fixed_capacity;
 
   auto buf = std::make_unique<uint8_t[]>(capacity);
 
-  uint16_t fixed_offset = 0;
-  uint16_t var_offset = capacity - var_capacity;
-  std::memcpy(&buf[bitmap], &bytes, sizeof(bytes));
+  offset_t fixed_offset = 0;
+  offset_t var_offset = capacity - var_capacity;
+  write(buf.get(), bitmap, bytes);
   for (size_t i = 0; i < fields.size(); ++i) {
     if (!fields[i].empty()) {
       buf[fixed_offset + (i / CHAR_BIT)] |= 1 << (ROUND_UP - (i % CHAR_BIT));
@@ -81,24 +82,23 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
     std::cout << fields[i] << " ";
     switch (schema.columns[i].type) {
     case INT: {
-      int val_as_int = std::stoi(fields[i]);
-      std::memcpy(&buf[fixed_offset], &val_as_int, sizeof(int));
+      const int val_as_int = std::stoi(fields[i]);
+      write(buf.get(), fixed_offset, val_as_int);
       fixed_offset += sizeof(int);
       break;
     }
     case FLOAT: {
-      float val_as_float = std::stof(fields[i]);
-      std::memcpy(&buf[fixed_offset], &val_as_float, sizeof(float));
+      const float val_as_float = std::stof(fields[i]);
+      write(buf.get(), fixed_offset, val_as_float);
       fixed_offset += sizeof(float);
       break;
     }
     case VARCHAR: {
-      length_t length = fields[i].size();
-      std::memcpy(&buf[fixed_offset], &var_offset, sizeof(offset_t));
-      std::memcpy(&buf[fixed_offset + sizeof(offset_t)], &length,
-                  sizeof(length_t));
+      const length_t length = fields[i].size();
+      write(buf.get(), fixed_offset, var_offset);
+      write(buf.get(), fixed_offset + sizeof(offset_t), length);
       fixed_offset += (sizeof(offset_t) + sizeof(length_t));
-      std::memcpy(&buf[var_offset], fields[i].data(), length);
+      write(buf.get(), var_offset, fields[i].data(), sizeof(fields[i].data()));
       var_offset += length;
       break;
     }
