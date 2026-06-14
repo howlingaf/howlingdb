@@ -5,16 +5,33 @@
 #include <print>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
-#include "BufferPoolManager.hpp"
+#include "src/buffer_pool_manager/BufferPoolManager.hpp"
 
-#include "types.hpp"
+enum State : int8_t {
+  Success,
+  PartialSuccess,
+  Failure,
+};
 
-std::unordered_map<int, std::string> error_code_to_message = {
+struct Valid {};
+
+struct Invalid {
+  std::string reason;
+  int error_row;
+  int error_col;
+};
+
+using ValidatorResult = std::variant<Valid, Invalid>;
+
+ValidatorResult validate(std::ifstream &reader);
+
+const std::unordered_map<int, std::string> error_code_to_message = {
     {1, "Invalid Csv."},
 };
 
-std::string PATH_TO_CSV = "./example.csv";
+const std::string PATH_TO_CSV = "./example.csv";
 
 int main() {
   auto now = std::chrono::system_clock::now();
@@ -25,11 +42,11 @@ int main() {
     return 1;
   };
 
-  BufferPoolManager buffer_manager;
+  BufferPoolManager manager;
   ValidatorResult is_valid = validate(file);
   if (std::holds_alternative<Valid>(is_valid)) {
     std::cout << "Csv is valid" << '\n';
-    buffer_manager.ingest(file);
+    manager.ingest(file);
   }
 
   if (std::holds_alternative<Invalid>(is_valid)) {

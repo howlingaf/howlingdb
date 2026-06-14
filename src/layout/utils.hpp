@@ -1,13 +1,8 @@
-// buffer I/O is abstract
-// name spaces specific
-// layout types
-//
-//
 #pragma once
 #include <cstdint>
 #include <cstring>
 
-#include "../types/layout.hpp"
+#include "types.hpp"
 
 template <typename T> void write(uint8_t *data, offset_t offset, const T &val) {
   std::memcpy(&data[offset], &val, sizeof(val));

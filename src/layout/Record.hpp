@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <memory>
+
 #include <climits>
 #include <cstddef>
 #include <cstdint>
@@ -8,9 +11,17 @@
 #include <string>
 #include <vector>
 
-#include "src/types/layout.hpp"
-#include "src/util/layout.hpp"
+#include "../catalog/Schema.hpp"
 #include "types.hpp"
+#include "utils.hpp"
+
+class Record {
+public:
+  std::unique_ptr<uint8_t[]> data;
+  uint16_t size{};
+
+  template <typename T> T *get_val();
+};
 
 Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
 
@@ -65,7 +76,6 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
 
   const uint8_t ROUND_UP = 7;
   const uint16_t bytes = (schema.columns.size() + ROUND_UP) / CHAR_BIT;
-
   capacity += sizeof(bytes);
   const uint8_t bitmap = fixed_capacity;
 

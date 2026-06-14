@@ -1,9 +1,9 @@
 #include <array>
 #include <cstdint>
-#include <cstring>
 
-#include "../types/layout.hpp"
-
+#include "Record.hpp"
+#include "types.hpp"
+#include "utils.hpp"
 // ======================================================================
 // Slotted page (block) layout
 //
@@ -14,7 +14,7 @@
 //  +----+----+-|--+-|--+-|--+----------------+-^--+-^--+-^--+
 //             |    |    +---------------------+    |    |
 //             |    +-------------------------------+    |
-//             +-----------------------------------------+
+//             +-----------------------------------------// hex dumps+
 //
 //   #ent  = number of slot entries
 //   eofs  = end-of-free-space pointer (free-space / records boundary)
@@ -31,29 +31,32 @@
 // static asserts on defined types
 // audit memcpy for overlaps
 // audit sentinels
-// hex dumps
 // layout constants
+// page validation
+// page_dump
 
-struct Page {
-
-  std::array<uint8_t, PAGE_SIZE> data;
+class Page {
+public:
+  std::array<uint8_t, PAGE_SIZE> buf{};
   uint8_t id = 0;
-  uint16_t entries = 0;
+  entries_t entries = 0;
   uint16_t free_space = PAGE_SIZE - sizeof(header_t);
-  uint16_t free_space_offset = PAGE_SIZE;
+  offset_t free_space_offset = PAGE_SIZE;
   // TODO: have you been dirty
 
   // TODO: constructor to load from disk
+
   Page() : Page(0) {};
   Page(uint8_t id) : id(id) {
-    std::memcpy(&data[ENTRIES_OFFSET], &entries, sizeof(entries_t));
-    std::memcpy(&data[FREE_SPACE_OFFSET], &free_space_offset,
-                sizeof(free_space_t));
+    write(buf.data(), ENTRIES_OFFSET, entries);
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
 
   int insert(const Record &record) {
-    // TODO: handle not enough space
-    // TODO: guard for dummy slots
+
+    if (free_space < record.size) {
+      return 1; // find another record with same catalogue (in pool or disk)
+    }
 
     //  Block Header                              Records
     //                                     EOFS---v
@@ -65,24 +68,37 @@ struct Page {
     //             +-----------------------------------------+
 
     free_space_offset -= record.size;
-    const uint16_t start = sizeof(header_t) + entries * sizeof(slot_t);
-    std::memcpy(&data[free_space_offset], record.data.get(), record.size);
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
 
-    free_space -= record.size + sizeof(slot_t);
+    const offset_t start = sizeof(header_t);
+    const offset_t end = start + entries * sizeof(slot_t); // handles empty
+                                                           // slots
 
-    std::memcpy(&data[FREE_SPACE_OFFSET], &free_space_offset,
-                sizeof(free_space_t));
-    std::memcpy(&data[ENTRIES_OFFSET], &(++entries), sizeof(entries_t));
+    for (offset_t p = start; p < end; p += sizeof(slot_t)) {
+      const auto offset = read<offset_t>(buf.data(), p);
+      if (offset == 0) {
+        const uint16_t insert_offset = free_space_offset - record.size;
+        write(buf.data(), insert_offset, record.data.get(), record.size);
+        write(buf.data(), p, insert_offset);
+        write(buf.data(), p + sizeof(offset_t), record.size);
+        return 0;
+      }
+    }
 
-    const offset_t offset = start;
-    const length_t length = offset + sizeof(offset);
-    std::memcpy(&data[offset], &free_space_offset, sizeof(offset_t));
-    std::memcpy(&data[length], &record.size, sizeof(length_t));
+    write(record.data.get(), free_space_offset, record.size);
+
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
+    write(buf.data(), ENTRIES_OFFSET, ++entries);
+
+    free_space -= (record.size + sizeof(slot_t));
+
+    write(buf.data(), start, free_space_offset);
+    write(buf.data(), start + sizeof(offset_t), record.size);
     return 0;
   }
 
-  int update(uint8_t row_id, Record record) {
-
+  template <typename T> int update(uint8_t row_id, Column &col, T val) {
+    std::cout << val << "\n";
     //  Block Header                              Records
     //                                     EOFS---v
     //  +----+----+----+----+----+----------------+----+----+----+
@@ -92,11 +108,23 @@ struct Page {
     //             |    +-------------------------------+    |
     //             +-----------------------------------------+
 
-    // if (record.size > free_space()) {
-    //  find a page of the same schema and has enough space
-    //  else create a new Page for it
-    //  return 0;
-    //}
+    if constexpr (std::is_same_v<T, int> && col.type != INT) {
+      return 1;
+    }
+
+    if constexpr (std::is_same_v<T, float> && col.type != FLOAT) {
+      return 1;
+    }
+
+    if constexpr (std::is_same_v<T, std::string> && col.type != VARCHAR) {
+      return 1;
+    }
+
+    // normal case returns false template <> bool isString(char* t) { return
+    // true; } // but for char* or String.c_str() returns true
+
+    // look up field that needs to be updated (dest)
+    // cmp to field that we're updating to (src)
 
     // enough space
     // is the record buffer we're updating greater,less, same
@@ -114,20 +142,18 @@ struct Page {
     // 3. recalculate slots
     // blast radius would be contained within the page
 
-    offset_t offset;
-    length_t length;
     if (entries <= row_id) {
       return 1;
     }
-    const uint16_t site = sizeof(header_t) + row_id * sizeof(slot_t);
-    std::memcpy(&offset, &data[site], sizeof(offset_t));
-    std::memcpy(&length, &data[site + sizeof(offset_t)], sizeof(length_t));
+    const offset_t site = sizeof(header_t) + row_id * sizeof(slot_t);
+    const auto offset = read<offset_t>(buf.data(), site);
+    const auto length = read<length_t>(buf.data(), site + sizeof(offset_t));
 
-    const uint8_t *to_update = &data[offset];
-    // if updated_record > old_record:
-    // memcopy out all records left of old_record
-    // old_recordLeftp + (updated_record - old_record) = updated_record segment
-    // loop over buffer starting at update_recordLEFTp and memcopy back
+    // const uint16_t to_update = &data[offset];
+    //  if updated_record > old_record:
+    //  memcopy out all records left of old_record
+    //  old_recordLeftp + (updated_record - old_record) = updated_record segment
+    //  loop over buffer starting at update_recordLEFTp and memcopy back
 
     // walk record and to_update
     return 0;
@@ -138,24 +164,22 @@ struct Page {
       return 1;
     }
     const offset_t new_offset = 0;
-    offset_t offset;
-    length_t length;
 
     const uint16_t start = sizeof(header_t) + row_id * sizeof(slot_t);
     const uint16_t end = start + entries * sizeof(slot_t);
 
-    std::memcpy(&offset, &data[start], sizeof(offset_t));
-    std::memcpy(&length, &data[start + sizeof(offset_t)], sizeof(length_t));
+    auto offset = read<offset_t>(buf.data(), start);
+    auto length = read<length_t>(buf.data(), start + sizeof(offset_t));
 
     if (offset == 0) {
       return 0;
     }
 
     free_space += length + sizeof(slot_t);
-    std::memcpy(&data[ENTRIES_OFFSET], &(--entries), sizeof(entries_t));
-    std::memcpy(&data[start], &new_offset, sizeof(offset_t));
+    write(buf.data(), ENTRIES_OFFSET, --entries);
+    write(buf.data(), start, new_offset);
 
-    uint16_t p = start + sizeof(slot_t);
+    offset_t p = start + sizeof(slot_t);
 
     //  Block Header                              Records
     //                                     EOFS---v
@@ -167,31 +191,36 @@ struct Page {
     //             +-----------------------------------------+
 
     while (p < end) {
-      uint16_t temp;
-      std::memcpy(&temp, &data[p], sizeof(offset_t));
-      if (temp != 0) {
 
-        uint16_t prev_offset;
-        uint16_t prev_length;
+      const offset_t prev_offset = offset;
+      const length_t prev_length = length;
 
-        std::memcpy(&prev_offset, &offset, sizeof(offset_t));
-        std::memcpy(&prev_length, &length, sizeof(length_t));
+      offset = read<offset_t>(buf.data(), p);
+      length = read<length_t>(buf.data(), p + sizeof(offset_t));
+      if (offset == 0)
+        break;
 
-        std::memcpy(&offset, &data[p], sizeof(offset_t));
-        std::memcpy(&length, &data[p + sizeof(offset_t)], sizeof(length_t));
+      const uint16_t insert_end = prev_offset + prev_length;
+      const uint16_t insert_start = insert_end - length;
+      write(buf.data(), insert_start, offset, length);
 
-        const uint16_t insert_end = prev_offset + prev_length;
-        const uint16_t insert_start = insert_end - length;
-        std::memmove(&data[insert_start], &data[offset], length);
-
-        offset = insert_start;
-        std::memcpy(&data[p], &offset, sizeof(offset_t));
-      }
+      offset = insert_start;
+      write(buf.data(), p, offset);
       p += sizeof(slot_t);
     }
     free_space_offset = offset;
-    std::memcpy(&data[FREE_SPACE_OFFSET], &free_space_offset, sizeof(offset_t));
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
 
     return 0;
   }
+
+  // template <> bool is_int(int) { return true; }
+  // template <> bool is_float<U>(float) { return true; }
+  // template <> bool is_string(std::string) { return true; }
+
+  // where you return the result as numbers template<char> char
+  // function_name(int) {return 1}; template<int> char function_name(int)
+  // {return 2}; template<string> char function_name(int) {return 3};
+
+  // template <class T> bool is_string(float t) { return false; }
 };

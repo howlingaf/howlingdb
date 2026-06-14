@@ -5,8 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "DiskManager.hpp"
-#include "types.hpp"
+#include "../catalog/Schema.hpp"
+#include "../disk_manager/DiskManager.hpp"
 
 struct LRUCache {
 
@@ -78,13 +78,13 @@ struct BufferPoolManager {
   Schema schema;
 
   // TODO: needs pool and disk check
-  int insert(Schema schema, Record record) {
-    if (curr_page.free_space < record.size) {
-      pool.add(curr_page);
-      curr_page.data.fill(0);
-      curr_page.id++;
-    }
-    curr_page.insert(record);
+  int insert(const Schema &schema, Record record) {
+    // if (curr_page.free_space < record.size) {
+    //   pool.add(curr_page);
+    //   curr_page.data.fill(0);
+    //   curr_page.id++;
+    // }
+    // curr_page.insert(record);
     return 0;
   }
 
@@ -110,23 +110,20 @@ struct BufferPoolManager {
   }
 
   // TODO: needs pool and disk check
-  int update(uint8_t page_id, uint8_t row_id, Record record) {
-    if (curr_page.id == page_id) {
-      curr_page.update(row_id, std::move(record));
-      return 0;
-    }
-
-    if (pool.is_present(page_id)) {
-      pool.update_pos(page_id);
-      curr_page = pool.top();
-    }
-    return 0;
-  }
+  // int update(uint8_t page_id, uint8_t row_id, Schema &schema) {
+  //   if (curr_page.id == page_id) {
+  //     curr_page.update(page_id, row_id, val);
+  //     return 0;
+  //   }
+  //
+  //   if (pool.is_present(page_id)) {
+  //     pool.update_pos(page_id);
+  //     curr_page = pool.top();
+  //   }
+  //   return 0;
+  // }
 
   int ingest(std::ifstream &reader) {
-    int success_count;
-    int failure_count;
-    int runtime;
     std::cout << "Initiating ingestion" << '\n';
     bool IN_VALUE = false;
     std::vector<std::string> headers;

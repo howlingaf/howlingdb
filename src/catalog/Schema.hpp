@@ -1,8 +1,16 @@
-#include "types.hpp"
+#pragma once
+
 #include <charconv>
 #include <string>
 #include <system_error>
 #include <vector>
+
+#include "../layout/types.hpp" //should schema types be in here?
+
+struct Schema {
+  std::vector<Column> columns;
+  uint8_t id{}; // needs to be dynamic
+};
 
 // assumes the first row is a reliable source to extrapolate
 Schema create_schema(std::vector<std::string> &keys,
@@ -17,7 +25,8 @@ Schema create_schema(std::vector<std::string> &keys,
     auto start = curr.data();
     auto end = curr.data() + curr.size();
 
-    std::from_chars_result parsed_int = std::from_chars(start, end, result_int);
+    const std::from_chars_result parsed_int =
+        std::from_chars(start, end, result_int);
     if (parsed_int.ec == std::errc() && parsed_int.ptr == end) {
       col.type = INT;
       col.name = keys[i];
@@ -25,7 +34,7 @@ Schema create_schema(std::vector<std::string> &keys,
       continue;
     }
 
-    std::from_chars_result parsed_float =
+    const std::from_chars_result parsed_float =
         std::from_chars(start, end, result_float);
 
     if (parsed_float.ec == std::errc() && parsed_float.ptr == end) {
