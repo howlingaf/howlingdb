@@ -5,6 +5,7 @@
 
 #include "src/types/layout.hpp"
 #include "src/util/layout.hpp"
+#include "types.hpp"
 
 // ======================================================================
 // Slotted page (block) layout
@@ -47,11 +48,13 @@ struct Page {
   // TODO: have you been dirty
 
   // TODO: constructor to load from disk
+
   Page() : Page(0) {};
   Page(uint8_t id) : id(id) {
     write(buf.data(), ENTRIES_OFFSET, entries);
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
+
   int insert(const Record &record) {
 
     if (free_space < record.size) {
@@ -67,12 +70,12 @@ struct Page {
     //             |    +-------------------------------+    |
     //             +-----------------------------------------+
 
-    // TODO: find first dummy slot or last slot
     free_space_offset -= record.size;
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
 
     const uint16_t start = sizeof(header_t);
-    const uint16_t end = sizeof(header_t) + entries * sizeof(slot_t);
+    const uint16_t end = start + entries * sizeof(slot_t); // handles empty
+                                                           // slots
 
     for (offset_t p = start; p < end; p += sizeof(slot_t)) {
       const auto offset = read<offset_t>(buf.data(), p);
@@ -85,19 +88,15 @@ struct Page {
       }
     }
 
-    // did we insert?
     write(free_space_offset, record.data.get(), record.size);
-
-    free_space -= record.size + sizeof(slot_t);
 
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
     write(buf.data(), ENTRIES_OFFSET, ++entries);
 
-    const offset_t offset = start;
-    const length_t length = offset + sizeof(offset);
+    free_space -= (record.size + sizeof(slot_t));
 
-    write(buf.data(), offset, free_space_offset);
-    write(buf.data(), length, record.size);
+    write(buf.data(), start, free_space_offset);
+    write(buf.data(), start + sizeof(offset_t), record.size);
     return 0;
   }
 
@@ -170,8 +169,6 @@ struct Page {
     }
 
     free_space += length + sizeof(slot_t);
-    // write(ENTRIES_OFFSET, --entries);
-    // std::memcpy(&data[ENTRIES_OFFSET], &(--entries), sizeof(entries_t));
     write(buf.data(), ENTRIES_OFFSET, --entries);
     write(buf.data(), start, new_offset);
 
