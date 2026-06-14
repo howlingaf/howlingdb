@@ -1,10 +1,17 @@
-#include "types.hpp"
 #include <fstream>
 
-ValidatorResult validate(std::ifstream &reader) {
+enum Result : uint8_t {
+  SUCCESS,
+  PARTIAL,
+  FAIL,
+};
+
+const int INVALID_CHAR_UPPER_BOUND = 32;
+
+Result validate(std::ifstream &reader) {
 
   if (reader.peek() == EOF) {
-    return Invalid{"File is empty."};
+    return FAIL;
   }
 
   reader.clear();
@@ -14,15 +21,14 @@ ValidatorResult validate(std::ifstream &reader) {
   int row = 0;
   int col = 0;
   while (!reader.eof()) {
-    char curr = reader.get();
-    unsigned char currd = (unsigned char)curr;
-    if (currd < 32 && currd != 9 && currd != 10 && currd != 13) {
-      return Invalid{"Invalid characters found (likely not text file).\n", row,
-                     col};
+    const int curr = reader.get();
+    const int currd = (unsigned char)curr;
+    if (currd < INVALID_CHAR_UPPER_BOUND) {
+      return FAIL;
     }
 
     if (in_quote) {
-      char next = reader.peek();
+      const int next = reader.peek();
       if (curr == '"') {
         if (next == '"') {
           reader.ignore();
@@ -30,8 +36,7 @@ ValidatorResult validate(std::ifstream &reader) {
         } else if (next == '\n' || next == ',' || next == '\r') {
           in_quote = false;
         } else {
-          return Invalid{"Ambiguity found within quote due to double quotes\n",
-                         row, col};
+          return FAIL;
         }
       }
     } else {
@@ -49,10 +54,9 @@ ValidatorResult validate(std::ifstream &reader) {
     col++;
   }
   if (in_quote) {
-    return Invalid{"Ambiguity found within quote due to double quotes\n", row,
-                   col};
+    return FAIL;
   }
   reader.clear();
   reader.seekg(0);
-  return Valid{};
+  return SUCCESS;
 }
