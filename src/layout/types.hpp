@@ -10,6 +10,7 @@ using header_t = uint32_t;
 using entries_t = uint16_t;
 using free_space_t = uint16_t;
 
+using ident_t = uint8_t;
 using slot_t = uint32_t;
 using offset_t = uint16_t;
 using length_t = uint16_t;

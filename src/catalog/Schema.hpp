@@ -9,14 +9,12 @@
 
 struct Schema {
   std::vector<Column> columns;
-  uint8_t id{}; // needs to be dynamic
+  ident_t id; // refer to prev schema for new id if id doesnt exist on disk
 };
 
-// assumes the first row is a reliable source to extrapolate
 Schema create_schema(std::vector<std::string> &keys,
-                     std::vector<std::string> &first_row) {
-
-  Schema schema;
+                     std::vector<std::string> &first_row, ident_t id = 0) {
+  std::vector<Column> columns;
   for (size_t i = 0; i < keys.size(); i++) {
     Column col;
     int result_int{};
@@ -30,7 +28,7 @@ Schema create_schema(std::vector<std::string> &keys,
     if (parsed_int.ec == std::errc() && parsed_int.ptr == end) {
       col.type = INT;
       col.name = keys[i];
-      schema.columns.push_back(col);
+      columns.push_back(col);
       continue;
     }
 
@@ -40,14 +38,13 @@ Schema create_schema(std::vector<std::string> &keys,
     if (parsed_float.ec == std::errc() && parsed_float.ptr == end) {
       col.type = FLOAT;
       col.name = keys[i];
-      schema.columns.push_back(col);
+      columns.push_back(col);
       continue;
     }
 
     col.type = VARCHAR;
     col.name = keys[i];
-    schema.columns.push_back(col);
+    columns.push_back(col);
   }
-
-  return schema;
+  return Schema{.columns = columns, .id = id};
 }

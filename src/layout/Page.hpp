@@ -4,6 +4,7 @@
 #include "Record.hpp"
 #include "types.hpp"
 #include "utils.hpp"
+
 // ======================================================================
 // Slotted page (block) layout
 //
@@ -35,25 +36,28 @@
 // page validation
 // page_dump
 
-class Page {
-public:
+struct Page {
   std::array<uint8_t, PAGE_SIZE> buf{};
-  uint8_t id = 0;
+  ident_t id = 0;
   entries_t entries = 0;
   uint16_t free_space = PAGE_SIZE - sizeof(header_t);
   offset_t free_space_offset = PAGE_SIZE;
+  ident_t schema_id;
   // TODO: have you been dirty
 
   // TODO: constructor to load from disk
 
-  Page() : Page(0) {};
-  Page(uint8_t id) : id(id) {
+  Page(ident_t schema_id) : schema_id(schema_id) {
+    write(buf.data(), ENTRIES_OFFSET, entries);
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
+  };
+
+  Page(ident_t page_id, ident_t schema_id) : id(page_id), schema_id(schema_id) {
     write(buf.data(), ENTRIES_OFFSET, entries);
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
 
   int insert(const Record &record) {
-
     if (free_space < record.size) {
       return 1; // find another record with same catalogue (in pool or disk)
     }
@@ -97,6 +101,7 @@ public:
     return 0;
   }
 
+  // TODO: Page::update
   template <typename T> int update(uint8_t row_id, Column &col, T val) {
     std::cout << val << "\n";
     //  Block Header                              Records
@@ -119,9 +124,6 @@ public:
     if constexpr (std::is_same_v<T, std::string> && col.type != VARCHAR) {
       return 1;
     }
-
-    // normal case returns false template <> bool isString(char* t) { return
-    // true; } // but for char* or String.c_str() returns true
 
     // look up field that needs to be updated (dest)
     // cmp to field that we're updating to (src)

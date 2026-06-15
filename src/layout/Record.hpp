@@ -15,19 +15,22 @@
 #include "types.hpp"
 #include "utils.hpp"
 
-class Record {
-public:
+struct Record {
   std::unique_ptr<uint8_t[]> data;
-  uint16_t size{};
+  size_t size{};
+  ident_t id = 0;
+  Record(std::unique_ptr<unsigned char[]> d, size_t s, ident_t id = 0)
+      : data(std::move(d)), size(s), id(id) {}
 
   template <typename T> T *get_val();
 };
 
-Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
+Record create_record(const std::vector<std::string> &fields,
+                     const Schema &schema) {
 
-  uint16_t capacity = 0;
-  uint16_t fixed_capacity = 0;
-  uint16_t var_capacity = 0;
+  size_t capacity = 0;
+  size_t fixed_capacity = 0;
+  size_t var_capacity = 0;
 
   for (size_t i = 0; i < schema.columns.size(); ++i) {
 
@@ -69,9 +72,9 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
   //   65000    -> salary    (fixed-length, in the fixed part of the record)
   //
   //   Fixed part = the (offset,length) pairs + fixed-length attrs + null
-  //   bitmap. Variable-length data is appended after, referenced by the offset
-  //   pairs. Null bitmap: bit i set => attribute i is NULL (0000 here => none
-  //   null).
+  //   bitmap. Variable-length data is appended after, referenced by the
+  //   offset pairs. Null bitmap: bit i set => attribute i is NULL (0000 here
+  //   => none null).
   // ============================================================================
 
   const uint8_t ROUND_UP = 7;
@@ -116,7 +119,6 @@ Record serialize(const std::vector<std::string> &fields, const Schema &schema) {
       throw std::runtime_error("Unknown column type found");
     }
   }
-
   std::cout << '\n';
-  return Record{.data = std::move(buf), .size = capacity};
+  return Record{std::move(buf), capacity};
 }

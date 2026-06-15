@@ -70,21 +70,23 @@ struct LRUCache {
 };
 
 struct BufferPoolManager {
-
   LRUCache pool;
 
   // TODO: checkout/release on pool
   Page curr_page;
   Schema schema;
 
+  BufferPoolManager();
+
   // TODO: needs pool and disk check
-  int insert(const Schema &schema, Record record) {
-    // if (curr_page.free_space < record.size) {
-    //   pool.add(curr_page);
-    //   curr_page.data.fill(0);
-    //   curr_page.id++;
-    // }
-    // curr_page.insert(record);
+  int insert(Record record) {
+
+    if (curr_page.free_space < record.size) {
+      // look at pool
+      // look at disk
+      // if neither, create
+    }
+    curr_page.insert(record);
     return 0;
   }
 
@@ -129,7 +131,6 @@ struct BufferPoolManager {
     std::vector<std::string> headers;
     std::vector<std::string> row;
     uint64_t count = -1;
-    Schema schema;
     std::stringstream value;
     bool field_start = true;
     while (!reader.eof()) {
@@ -167,10 +168,8 @@ struct BufferPoolManager {
             schema = create_schema(headers, row);
             headers.clear();
           }
-          Record record = serialize(row, schema);
-          if (record.size <= curr_page.free_space) {
-          }
-          insert(schema, std::move(record));
+          Record record = create_record(row, schema);
+          insert(std::move(record));
         }
         count++;
         row.clear();

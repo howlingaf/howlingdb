@@ -10,7 +10,7 @@
 struct DiskManager {
 
   int write(Page page) {
-    std::cout << page.id;
+    std::cout << page.id; // catalog id
     ;
     return 0;
   }
