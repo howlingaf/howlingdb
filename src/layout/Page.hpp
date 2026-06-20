@@ -1,5 +1,7 @@
 #include <array>
 #include <cstdint>
+#include <string_view>
+#include <type_traits>
 
 #include "Record.hpp"
 #include "types.hpp"
@@ -102,7 +104,9 @@ struct Page {
   }
 
   // TODO: Page::update
-  template <typename T> int update(uint8_t row_id, Column &col, T val) {
+  template <typename T>
+  int update(Schema &schema, ident_t page_id, ident_t row_id, Column col,
+             T val) {
     std::cout << val << "\n";
     //  Block Header                              Records
     //                                     EOFS---v
@@ -113,15 +117,15 @@ struct Page {
     //             |    +-------------------------------+    |
     //             +-----------------------------------------+
 
-    if constexpr (std::is_same_v<T, int> && col.type != INT) {
+    if (std::is_integral_v<T> && col.type != INT) {
       return 1;
     }
 
-    if constexpr (std::is_same_v<T, float> && col.type != FLOAT) {
+    if (std::is_floating_point_v<T> && col.type != FLOAT) {
       return 1;
     }
 
-    if constexpr (std::is_same_v<T, std::string> && col.type != VARCHAR) {
+    if (std::is_constructible_v<std::string_view, T> && col.type != VARCHAR) {
       return 1;
     }
 
@@ -215,14 +219,4 @@ struct Page {
 
     return 0;
   }
-
-  // template <> bool is_int(int) { return true; }
-  // template <> bool is_float<U>(float) { return true; }
-  // template <> bool is_string(std::string) { return true; }
-
-  // where you return the result as numbers template<char> char
-  // function_name(int) {return 1}; template<int> char function_name(int)
-  // {return 2}; template<string> char function_name(int) {return 3};
-
-  // template <class T> bool is_string(float t) { return false; }
 };

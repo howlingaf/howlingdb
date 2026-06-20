@@ -91,7 +91,7 @@ struct BufferPoolManager {
   }
 
   // TODO: needs pool and disk check
-  std::optional<Page> fetch(uint8_t page_id) {
+  std::optional<Page> fetch(ident_t page_id) {
     if (page_id == curr_page.id)
       return curr_page;
     std::optional<Page> page = pool.fetch(page_id);
@@ -103,7 +103,7 @@ struct BufferPoolManager {
   }
 
   // TODO: needs pool and disk check
-  int remove(uint8_t page_id, uint8_t row_id) {
+  int remove(ident_t page_id, ident_t row_id) {
     if (curr_page.id == page_id) {
       curr_page.remove(row_id);
       return 0;
@@ -111,19 +111,22 @@ struct BufferPoolManager {
     return 1;
   }
 
-  // TODO: needs pool and disk check
-  // int update(uint8_t page_id, uint8_t row_id, Schema &schema) {
-  //   if (curr_page.id == page_id) {
-  //     curr_page.update(page_id, row_id, val);
-  //     return 0;
-  //   }
-  //
-  //   if (pool.is_present(page_id)) {
-  //     pool.update_pos(page_id);
-  //     curr_page = pool.top();
-  //   }
-  //   return 0;
-  // }
+  template <typename T> int update(ident_t page_id, ident_t row_id, T val) {
+
+    if (curr_page.id == page_id) {
+      curr_page.update(schema, page_id, row_id, val);
+      return 0;
+    }
+
+    // check pool, disk
+    // if (pool.is_present(page_id)) {
+    //   pool.update_pos(page_id);
+    //   curr_page = pool.top();
+    // }
+    //
+
+    return 0;
+  }
 
   int ingest(std::ifstream &reader) {
     std::cout << "Initiating ingestion" << '\n';
