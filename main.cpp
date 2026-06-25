@@ -5,7 +5,7 @@
 #include <string>
 
 #include "src/buffer_pool_manager/BufferPoolManager.hpp"
-#include "validate.hpp"
+#include "src/ingest/validate.hpp"
 
 const std::string PATH_TO_CSV = "./example.csv";
 
