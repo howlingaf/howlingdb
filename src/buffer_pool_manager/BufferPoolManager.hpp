@@ -111,7 +111,7 @@ struct BufferPoolManager {
     return 1;
   }
 
-  template <typename T> int update(ident_t page_id, ident_t row_id, T val) {
+  template <typename T> int update(const Schema& schema, const ident_t page_id, const ident_t row_id, const T val) {
 
     if (curr_page.id == page_id) {
       curr_page.update(schema, page_id, row_id, val);
