@@ -1,3 +1,4 @@
+#pragma once
 #include <cstdint>
 #include <memory>
 
@@ -10,28 +11,171 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <string>
+#include <optional>
 
 #include "../catalog/Schema.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
+// ============================================================================
+// Variable-length record layout
+//   instructor(ID, name, dept_name, salary)
+//     - ID, name, dept_name : varchar -> stored as (offset, length) pairs
+//     - salary              : fixed-length (lives in the fixed portion)
+//
+// 0       4        8        12              20 21      26           36 45
+// +-------+--------+--------+---------------+--+-------+------------+------------+
+// | 21, 5 | 26, 10 | 36, 10 |     65000     |  | 10101 | Srinivasan |
+// Comp.Sci
+// +-------+--------+--------+---------------+--+-------+------------+------------+
+//                                            ^
+//                                            null bitmask (1 byte) = 0000
+//
+//   (21, 5)  -> ID        @ byte 21, len 5   -> "10101"
+//   (26, 10) -> name      @ byte 26, len 10  -> "Srinivasan"
+//   (36, 10) -> dept_name @ byte 36, len 10  -> "Comp. Sci."
+//   65000    -> salary    (fixed-length, in the fixed part of the record)
+//
+//   Fixed part = the (offset,length) pairs + fixed-length attrs + null
+//   bitmask. Variable-length data is appended after, referenced by the
+//   offset pairs. Null bitmask: bit i set => attribute i is NULL (0000 here
+//   => none null).
+// ============================================================================
+
+
+constexpr uint8_t ROUND_UP = 7;
+
 struct Record {
   std::unique_ptr<uint8_t[]> data;
+  const Schema& schema;
   size_t size{};
-  ident_t id = 0;
-  Record(std::unique_ptr<unsigned char[]> d, size_t s, ident_t id = 0)
-      : data(std::move(d)), size(s), id(id) {}
+  
+  void update(const Column& col, std::string val){
+    size_t ci = col_pos(col);
+    
+    const offset_t bitmask = bitmask_offset();
+    auto ith = (ROUND_UP - (ci % CHAR_BIT));
 
-  template <typename T> T *get_val();
+    const offset_t slot = ci * sizeof(slot_t);
+
+    const offset_t offset = read<offset_t>(data.get(), slot);
+    const length_t length = read<offset_t>(data.get(), slot + sizeof(offset_t));
+
+    if (val.size() <= length){
+      offset_t insert = offset;
+      write(data.get(), insert, val.data(), (length_t)val.size());
+      write(data.get(), slot + sizeof(offset_t),(length_t)val.size());
+      if (0 < val.size()){
+        data[bitmask + ci/CHAR_BIT] |= 1 << ith;
+      } else data[bitmask + ci/CHAR_BIT] &= ~(1 << ith);
+
+      insert+=(length_t)val.size();
+      for (ci++; ci < schema.columns.size(); ci++){
+        if (schema.columns[ci].type == INT) continue;
+        if (schema.columns[ci].type == FLOAT) continue;
+
+        const offset_t slot = ci * sizeof(slot_t);
+        const offset_t off = read<offset_t>(data.get(), slot);
+        const length_t len = read<length_t>(data.get(), slot + sizeof(offset_t));
+        auto entry = &data[off];
+        write(data.get(), insert, entry, len);
+        write(data.get(), slot, insert);
+        write(data.get(), slot + sizeof(offset_t), len);
+        insert += len;
+      }
+    }
+
+    if (length < val.size()){
+      const length_t extra = val.size() - length;
+      const offset_t off = offset;
+      const length_t len = val.size();
+      
+      const offset_t next = offset + length;
+      auto entry = reinterpret_cast<unsigned char*>(val.data());
+      const offset_t end = data_end();
+
+      data[bitmask + ci/CHAR_BIT] |= 1 << ith;
+
+      write(data.get(), next + extra, next, end - next);
+      write(data.get(), off, entry, len);
+      write(data.get(), slot + sizeof(offset_t), len);
+
+      for (ci++; ci < schema.columns.size(); ci++){
+        if (schema.columns[ci].type == INT) continue;
+        if (schema.columns[ci].type == FLOAT) continue;
+
+        const offset_t slot = ci * sizeof(slot_t);
+        const offset_t noff = read<offset_t>(data.get(), slot);
+        write(data.get(), slot, noff + extra);
+      }
+    }
+  };
+
+  template <typename T> 
+  void update(const Column& col, std::optional<T> opt){
+
+    const size_t ci = col_pos(col);
+    const offset_t bitmask = bitmask_offset();
+    auto ith = (ROUND_UP - (ci % CHAR_BIT));
+
+    if (opt.has_value()){
+      const offset_t slot = ci * sizeof(slot_t);
+      data[bitmask + ci/CHAR_BIT] |= 1 << ith;
+      write(data.get(), slot, opt.value());
+    } else data[bitmask + ci/CHAR_BIT] &= ~(1 << ith);
+
+  }
+  
+  offset_t data_end (){
+    for (slot_t i = schema.columns.size(); 0 <= i ; i--){
+      if (schema.columns[i].type == VARCHAR){
+        const slot_t slot = i * sizeof(slot_t);
+        const offset_t off = read<offset_t>(data.get(), i, sizeof(offset_t) );
+        const offset_t len = read<offset_t>(data.get(), i + sizeof(offset_t), sizeof(length_t) );
+        return off + len;
+      }
+    }
+    return schema.columns.size() * sizeof(slot_t);
+  }
+
+  offset_t bitmask_offset(){
+    offset_t off{};
+    for (auto col : schema.columns){
+      if (col.type == INT) off+=sizeof(int);
+      if (col.type == FLOAT) off+=sizeof(float);
+      if (col.type == VARCHAR) off+=(sizeof(slot_t));
+    }
+    return off;
+  }
+
+  offset_t col_pos(const Column& col){
+    for (offset_t i = 0; i < schema.columns.size(); i++){
+      if (schema.columns[i].name == col.name && schema.columns[i].type == col.type){
+        return i;
+      }
+    }
+    throw std::runtime_error{"col not found"};
+  }
+
+  length_t var_length(const Column& col){
+    for (offset_t i = 0; i < schema.columns.size(); i++){
+      if (schema.columns[i].name == col.name && schema.columns[i].type == col.type){
+        const offset_t off = i * sizeof(slot_t);
+        const length_t len = read<length_t>(data.get(), off + sizeof(offset_t), sizeof(length_t));
+        return len;
+      }
+    }
+    throw std::runtime_error{"col not found"};
+  }
 };
 
-Record create_record(const std::vector<std::string> &fields,
+inline Record create_record(const std::vector<std::string> &fields,
                      const Schema &schema) {
 
   size_t capacity = 0;
   size_t fixed_capacity = 0;
   size_t var_capacity = 0;
-
   for (size_t i = 0; i < schema.columns.size(); ++i) {
 
     switch (schema.columns[i].type) {
@@ -48,61 +192,43 @@ Record create_record(const std::vector<std::string> &fields,
       var_capacity += fields[i].size();
       break;
     default:
-      throw std::runtime_error("Unknown column type found");
+      throw std::runtime_error("");
     }
   }
 
-  // ============================================================================
-  // Variable-length record layout
-  //   instructor(ID, name, dept_name, salary)
-  //     - ID, name, dept_name : varchar -> stored as (offset, length) pairs
-  //     - salary              : fixed-length (lives in the fixed portion)
-  //
-  // 0       4        8        12              20 21      26           36 45
-  // +-------+--------+--------+---------------+--+-------+------------+------------+
-  // | 21, 5 | 26, 10 | 36, 10 |     65000     |  | 10101 | Srinivasan |
-  // Comp.Sci
-  // +-------+--------+--------+---------------+--+-------+------------+------------+
-  //                                            ^
-  //                                            null bitmap (1 byte) = 0000
-  //
-  //   (21, 5)  -> ID        @ byte 21, len 5   -> "10101"
-  //   (26, 10) -> name      @ byte 26, len 10  -> "Srinivasan"
-  //   (36, 10) -> dept_name @ byte 36, len 10  -> "Comp. Sci."
-  //   65000    -> salary    (fixed-length, in the fixed part of the record)
-  //
-  //   Fixed part = the (offset,length) pairs + fixed-length attrs + null
-  //   bitmap. Variable-length data is appended after, referenced by the
-  //   offset pairs. Null bitmap: bit i set => attribute i is NULL (0000 here
-  //   => none null).
-  // ============================================================================
-
-  const uint8_t ROUND_UP = 7;
   const uint16_t bytes = (schema.columns.size() + ROUND_UP) / CHAR_BIT;
   capacity += sizeof(bytes);
-  const uint8_t bitmap = fixed_capacity;
+  const uint8_t bitmask = fixed_capacity;
 
   auto buf = std::make_unique<uint8_t[]>(capacity);
 
   offset_t fixed_offset = 0;
   offset_t var_offset = capacity - var_capacity;
-  write(buf.get(), bitmap, bytes);
   for (size_t i = 0; i < fields.size(); ++i) {
-    if (!fields[i].empty()) {
-      buf[fixed_offset + (i / CHAR_BIT)] |= 1 << (ROUND_UP - (i % CHAR_BIT));
-    }
-
     std::cout << fields[i] << " ";
+
+    const uint8_t mask = 1 << (ROUND_UP - (i % CHAR_BIT));
+
     switch (schema.columns[i].type) {
     case INT: {
-      const int val_as_int = std::stoi(fields[i]);
-      write(buf.get(), fixed_offset, val_as_int);
+      if (!fields[i].empty()){
+        const int val_as_int = std::stoi(fields[i]);
+        write(buf.get(), fixed_offset, val_as_int);
+        buf[fixed_offset + (i / CHAR_BIT)] |= mask;
+      } else {
+        write(buf.get(), fixed_offset, std::nullopt);
+      }
       fixed_offset += sizeof(int);
       break;
     }
     case FLOAT: {
-      const float val_as_float = std::stof(fields[i]);
-      write(buf.get(), fixed_offset, val_as_float);
+      if (!fields[i].empty()){
+        const float val_as_float = std::stof(fields[i]);
+        write(buf.get(), fixed_offset, val_as_float);
+        buf[fixed_offset + (i / CHAR_BIT)] |= mask;
+      } else {
+        write(buf.get(), fixed_offset, std::nullopt);
+      }
       fixed_offset += sizeof(float);
       break;
     }
@@ -111,14 +237,19 @@ Record create_record(const std::vector<std::string> &fields,
       write(buf.get(), fixed_offset, var_offset);
       write(buf.get(), fixed_offset + sizeof(offset_t), length);
       fixed_offset += (sizeof(offset_t) + sizeof(length_t));
-      write(buf.get(), var_offset, fields[i].data(), sizeof(fields[i].data()));
+      if (fields[i].size() == 0) write(buf.get(), var_offset, std::nullopt);
+      else {
+        write(buf.get(), var_offset, fields[i].data(), length);
+        buf[fixed_offset + (i / CHAR_BIT)] |= mask;
+      } 
       var_offset += length;
       break;
     }
     default:
       throw std::runtime_error("Unknown column type found");
     }
+
   }
   std::cout << '\n';
-  return Record{std::move(buf), capacity};
+  return Record{std::move(buf), schema, capacity };
 }

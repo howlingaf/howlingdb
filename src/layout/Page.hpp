@@ -104,10 +104,9 @@ struct Page {
   }
 
   // TODO: Page::update
-  template <typename T>
-  int update(Schema &schema, ident_t page_id, ident_t row_id, Column col,
-             T val) {
+  template <typename T> int update(const Schema& schema, const ident_t row_id, const Column &col, const T val) {
     std::cout << val << "\n";
+
     //  Block Header                              Records
     //                                     EOFS---v
     //  +----+----+----+----+----+----------------+----+----+----+
@@ -129,39 +128,18 @@ struct Page {
       return 1;
     }
 
-    // look up field that needs to be updated (dest)
-    // cmp to field that we're updating to (src)
 
-    // enough space
-    // is the record buffer we're updating greater,less, same
-    // if same replace
-    //
-    //
-    // if updated_record < old_record:
-    // rewrite record from right to left
-    // loop over all records to the left and memcopy them starting at the start
-    // of the updated record
-    //
-    //
-    // 1..if i delete the record,
-    // 2. shift remaining records,
-    // 3. recalculate slots
-    // blast radius would be contained within the page
+    const offset_t p  = sizeof(header_t) + row_id * sizeof(slot_t);
+    const offset_t offset = read<offset_t>(buf.data(), p);
+    const length_t length = read<length_t>(buf.data(), p+sizeof(offset_t));
 
-    if (entries <= row_id) {
-      return 1;
-    }
-    const offset_t site = sizeof(header_t) + row_id * sizeof(slot_t);
-    const auto offset = read<offset_t>(buf.data(), site);
-    const auto length = read<length_t>(buf.data(), site + sizeof(offset_t));
+    std::unique_ptr<uint8_t[]> data = read<std::unique_ptr<uint8_t[]>>(buf.data(),offset,length);
+    Record record = Record{.data=std::move(data), .schema=schema, .size=length};
 
-    // const uint16_t to_update = &data[offset];
-    //  if updated_record > old_record:
-    //  memcopy out all records left of old_record
-    //  old_recordLeftp + (updated_record - old_record) = updated_record segment
-    //  loop over buffer starting at update_recordLEFTp and memcopy back
+    const length_t incum = record.var_length(col);
+    if (length + incum > PAGE_SIZE){} // need new page
+    record.update(col, val);
 
-    // walk record and to_update
     return 0;
   }
 

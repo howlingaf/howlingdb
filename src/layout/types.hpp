@@ -14,6 +14,7 @@ using ident_t = uint8_t;
 using slot_t = uint32_t;
 using offset_t = uint16_t;
 using length_t = uint16_t;
+using data_t = char*;
 
 constexpr entries_t ENTRIES_OFFSET = 0;
 constexpr offset_t FREE_SPACE_OFFSET = 2;

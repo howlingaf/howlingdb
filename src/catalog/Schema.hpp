@@ -22,7 +22,6 @@ Schema create_schema(std::vector<std::string> &keys,
     const auto &curr = first_row[i];
     auto start = curr.data();
     auto end = curr.data() + curr.size();
-
     const std::from_chars_result parsed_int =
         std::from_chars(start, end, result_int);
     if (parsed_int.ec == std::errc() && parsed_int.ptr == end) {

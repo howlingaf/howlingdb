@@ -14,7 +14,7 @@ void write(uint8_t *data, offset_t offset, const T *val, length_t length) {
 };
 
 // handles overlap when moving from one offset to another
-void write(uint8_t *data, offset_t offset_1, offset_t offset_2,
+inline void write(uint8_t *data, offset_t offset_1, offset_t offset_2,
            length_t length) {
   std::memmove(&data[offset_1], &data[offset_2], length);
 };
