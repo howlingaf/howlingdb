@@ -187,10 +187,11 @@ inline Record create_record(const std::vector<std::string> &fields,
       capacity += sizeof(float);
       fixed_capacity += sizeof(float);
       break;
-    case VARCHAR:
+    case VARCHAR: {
       capacity += fields[i].size();
       var_capacity += fields[i].size();
       break;
+    }
     default:
       throw std::runtime_error("");
     }
@@ -237,7 +238,7 @@ inline Record create_record(const std::vector<std::string> &fields,
       write(buf.get(), fixed_offset, var_offset);
       write(buf.get(), fixed_offset + sizeof(offset_t), length);
       fixed_offset += (sizeof(offset_t) + sizeof(length_t));
-      if (fields[i].size() == 0) write(buf.get(), var_offset, std::nullopt);
+      if ( length == 0) buf[fixed_offset + (i / CHAR_BIT)] &= ~mask;
       else {
         write(buf.get(), var_offset, fields[i].data(), length);
         buf[fixed_offset + (i / CHAR_BIT)] |= mask;

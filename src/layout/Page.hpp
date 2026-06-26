@@ -59,10 +59,6 @@ struct Page {
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
 
-  int insert(const Record &record) {
-    if (free_space < record.size) {
-      return 1; // find another record with same catalogue (in pool or disk)
-    }
 
     //  Block Header                              Records
     //                                     EOFS---v
@@ -73,30 +69,32 @@ struct Page {
     //             |    +-------------------------------+    |
     //             +-----------------------------------------+
 
-    free_space_offset -= record.size;
-    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
+
+  int insert(const Record &record) {
+    if (free_space < record.size) {
+      return 1; // find another record with same catalogue (in pool or disk)
+    }
 
     const offset_t start = sizeof(header_t);
     const offset_t end = start + entries * sizeof(slot_t); // handles empty
                                                            // slots
-
-    for (offset_t p = start; p < end; p += sizeof(slot_t)) {
+    offset_t p = start;
+    for (; p < end; p += sizeof(slot_t)) {
       const auto offset = read<offset_t>(buf.data(), p);
-      if (offset == 0) {
-        const uint16_t insert_offset = free_space_offset - record.size;
-        write(buf.data(), insert_offset, record.data.get(), record.size);
-        write(buf.data(), p, insert_offset);
-        write(buf.data(), p + sizeof(offset_t), record.size);
-        return 0;
-      }
+      if (offset == 0) break;
     }
 
-    write(record.data.get(), free_space_offset, record.size);
+    const uint16_t insert_offset = free_space_offset - record.size;
+    write(buf.data(), insert_offset, record.data.get(), record.size);
+    write(buf.data(), p, insert_offset);
+    write(buf.data(), p + sizeof(offset_t), record.size);
+
+    free_space -= (record.size + sizeof(slot_t));
+    free_space_offset = insert_offset;
 
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
     write(buf.data(), ENTRIES_OFFSET, ++entries);
 
-    free_space -= (record.size + sizeof(slot_t));
 
     write(buf.data(), start, free_space_offset);
     write(buf.data(), start + sizeof(offset_t), record.size);
@@ -136,10 +134,10 @@ struct Page {
     std::unique_ptr<uint8_t[]> data = read<std::unique_ptr<uint8_t[]>>(buf.data(),offset,length);
     Record record = Record{.data=std::move(data), .schema=schema, .size=length};
 
-    const length_t incum = record.var_length(col);
-    if (length + incum > PAGE_SIZE){} // need new page
+    const length_t add = record.var_length(col);
+    if (length + add > PAGE_SIZE){} // need new page
     record.update(col, val);
-
+    //TODO: still need to resize and update page if its it fits
     return 0;
   }
 

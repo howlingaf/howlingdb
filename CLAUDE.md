@@ -79,5 +79,11 @@ Documentation literacy is a nice-to-have here, not the objective. Never answer w
 10. **CLI interface** — test everything locally before adding networking
 11. **HTTP server, file upload, query console** — multi-user access
 
+## Issue workflow
+The developer works one GitHub issue (ticket) at a time. When a unit of work is done, the developer commits with a message of the form `closes #<issue-number>` (or tells me to commit). When that happens:
+1. **Push the commit** to the remote. Pushing the `closes #N` commit auto-closes issue #N on GitHub — that closure *is* clearing the to-do item; there is no separate to-do list API.
+2. **Never credit Claude.** No `Co-Authored-By: Claude` trailer and no Claude mention anywhere in the commit message or body.
+3. **Assign the next task.** After pushing, surface the next ticket from the backlog and hand it to the developer. The backlog is a strict linear queue sequenced by `[NNN]` title prefixes (not by issue number) — find the lowest-numbered open `[NNN]` issue and present it.
+
 ## Performance benchmarking
 The 1 Billion Row Challenge (1BRC) will be used as a performance benchmark. Target data domain: public county/local demographics and election data. Later stages will explore mmap, multithreading, and SIMD.

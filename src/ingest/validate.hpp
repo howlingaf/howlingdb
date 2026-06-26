@@ -8,7 +8,7 @@ enum Result : uint8_t {
 
 const int INVALID_CHAR_UPPER_BOUND = 32;
 
-Result validate(std::ifstream &reader) {
+inline Result validate(std::ifstream &reader) {
 
   if (reader.peek() == EOF) {
     return FAIL;
@@ -23,7 +23,8 @@ Result validate(std::ifstream &reader) {
   while (!reader.eof()) {
     const int curr = reader.get();
     const int currd = (unsigned char)curr;
-    if (currd < INVALID_CHAR_UPPER_BOUND) {
+
+    if (currd < INVALID_CHAR_UPPER_BOUND && currd != 10 && currd != 13 && currd != 9) {
       return FAIL;
     }
 
@@ -53,9 +54,8 @@ Result validate(std::ifstream &reader) {
     }
     col++;
   }
-  if (in_quote) {
-    return FAIL;
-  }
+  if (in_quote) return FAIL;
+
   reader.clear();
   reader.seekg(0);
   return SUCCESS;

@@ -12,7 +12,7 @@ struct Schema {
   ident_t id; // refer to prev schema for new id if id doesnt exist on disk
 };
 
-Schema create_schema(std::vector<std::string> &keys,
+inline Schema create_schema(std::vector<std::string> &keys,
                      std::vector<std::string> &first_row, ident_t id = 0) {
   std::vector<Column> columns;
   for (size_t i = 0; i < keys.size(); i++) {
