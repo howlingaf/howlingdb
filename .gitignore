@@ -1,6 +1,8 @@
 compile_flags.txt
 howlingdb
 rfc4180.txt
+.history
+.claude/
 /resources/
 /test/*
 /db/*
