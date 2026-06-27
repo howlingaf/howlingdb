@@ -14,9 +14,7 @@ A database management system built from scratch
 
 ---
 
-## Completed Readings
-
-_Papers worked through on stream via `/study`, newest last — one line each on what it taught._
+## Supporting Material
 
 <!-- annotations appended here -->
 
