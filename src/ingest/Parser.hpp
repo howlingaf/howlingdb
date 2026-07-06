@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -14,11 +15,12 @@ inline int ingest(std::ifstream &reader, BufferPoolManager& bpm){
   
   std::vector<std::string> headers;
   std::vector<std::string> row;
-  uint64_t count = -1;
+  int64_t count = -1;
   std::stringstream value;
   bool field_start = true;
+
   while (!reader.eof()) {
-    const uint8_t curr = reader.get();
+    const uint8_t curr = static_cast<uint8_t>(reader.get());
     if (curr == '"') {
       if (!IN_VALUE) {
         auto pos = reader.tellg();
@@ -30,7 +32,7 @@ inline int ingest(std::ifstream &reader, BufferPoolManager& bpm){
         }
         continue;
       }
-      const uint8_t next = reader.peek();
+      const uint8_t next = static_cast<uint8_t>(reader.peek());
       if (next == '\n' || next == ',') {
         IN_VALUE = false;
       } else if (next == '"') {
@@ -53,6 +55,7 @@ inline int ingest(std::ifstream &reader, BufferPoolManager& bpm){
           headers.clear();
         }
         Record record = create_record(row, schema);
+        record.print();
         bpm.insert(std::move(record));
       }
       count++;

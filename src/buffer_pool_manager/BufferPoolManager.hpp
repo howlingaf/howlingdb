@@ -13,7 +13,6 @@ struct LRUCache {
 
   DiskManager disk_manager;
   std::vector<Page> pages;
-  // TODO: pin/unpin for concurrency
 
   Page &top() { return pages.back(); }
 
@@ -25,13 +24,12 @@ struct LRUCache {
     return page;
   }
   bool is_present(uint8_t page_id) {
-    for (const auto page : pages) {
+    for (auto page : pages) {
       if (page.id == page_id)
         return true;
     }
     return false;
   }
-  // TODO: erase does linear lookup??
   void update_pos(uint8_t page_id) {
     for (auto i = pages.begin(); i != pages.end(); i++) {
       if (i->id == page_id) {
@@ -71,12 +69,14 @@ struct LRUCache {
 struct BufferPoolManager {
   LRUCache pool;
   std::optional<Page> curr_page;
-  // TODO: needs pool and disk check
+  // TODO: Pins
+
   int insert(Record record) {
+    const length_t len = static_cast<length_t>(record.size);
     if (!curr_page.has_value()){
       curr_page = Page(1);
     }
-    if (curr_page->free_space < record.size) {
+    if (curr_page->free_space < len ) {
       return 0;
       // look at pool
       // look at disk
@@ -113,13 +113,9 @@ struct BufferPoolManager {
       curr_page->update(schema, page_id, row_id, val);
       return 0;
     }
-
-    // check pool, disk
-    // if (pool.is_present(page_id)) {
-    //   pool.update_pos(page_id);
-    //   curr_page->= pool.top();
-    // }
-    //
+    
+    //TODO: Pool
+    //TODO: Disk
 
     return 0;
   }

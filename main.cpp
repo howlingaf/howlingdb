@@ -9,7 +9,6 @@
 #include "src/ingest/Parser.hpp"
 #include "src/buffer_pool_manager/BufferPoolManager.hpp"
 
-
 int main() {
   const std::string PATH_TO_CSV = "./example.csv";
 
