@@ -55,8 +55,7 @@ inline int ingest(std::ifstream &reader, BufferPoolManager& bpm){
           headers.clear();
         }
         Record record = create_record(row, schema);
-        record.print();
-        bpm.insert(std::move(record));
+        bpm.insert(schema, std::move(record));
       }
       count++;
       row.clear();

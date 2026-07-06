@@ -71,7 +71,7 @@ struct BufferPoolManager {
   std::optional<Page> curr_page;
   // TODO: Pins
 
-  int insert(Record record) {
+  int insert(const Schema &schema, Record record) {
     const length_t len = static_cast<length_t>(record.size);
     if (!curr_page.has_value()){
       curr_page = Page(1);
@@ -83,6 +83,7 @@ struct BufferPoolManager {
       // if neither, create
     }
     curr_page->insert(record);
+    curr_page->print(schema);
     return 0;
   }
 

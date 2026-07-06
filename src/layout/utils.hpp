@@ -12,7 +12,7 @@ template <typename T>
 void write(uint8_t *data, offset_t offset, const T *val, length_t length) {
   std::memcpy(&data[offset], val, length);
 };
-// handles overlap when moving from one offset to another
+
 inline void write(uint8_t *data, offset_t offset_1, offset_t offset_2,
            length_t length) {
   std::memmove(&data[offset_1], &data[offset_2], length);
@@ -23,11 +23,13 @@ inline std::string read(uint8_t *data, offset_t offset, length_t length) {
   return val;
 };
 
-template <typename T> T read(uint8_t *data, offset_t offset,length_t length) {
+
+template <typename T> T read(uint8_t *data, offset_t offset, length_t length) {
   T val{};
-  std::memcpy(&val, &data[offset], length );
+  std::memcpy(&val, &data[offset], length);
   return val;
 };
+
 
 template <typename T> T read(uint8_t *data, offset_t offset) {
   T val{};

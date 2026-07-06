@@ -1,7 +1,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
+#include <printf.h>
 #include <string_view>
 #include <type_traits>
 
@@ -32,14 +34,6 @@
 //   without changing ids (the directory is a level of indirection).
 // ======================================================================
 
-// read write templates
-// static asserts on defined types
-// audit memcpy for overlaps
-// audit sentinels
-// layout constants
-// page validation
-// page_dump
-
 struct Page {
   std::array<uint8_t, PAGE_SIZE> buf{};
   ident_t id = 0;
@@ -48,12 +42,6 @@ struct Page {
   offset_t free_space_offset = PAGE_SIZE;
   ident_t schema_id;
 
-  // void print(){
-  //   for (size_t si = 0; si < entries; si++ ){
-  //     const offset_t off = static_cast<offset_t>(sizeof(header_t) + si * sizeof(slot_t));
-  //   }
-  // }
-  //
 
   Page(ident_t schema_id) : schema_id(schema_id) {
     write(buf.data(), ENTRIES_OFFSET, entries);
@@ -65,24 +53,31 @@ struct Page {
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
 
-
-  //  Block Header                              Records
-  //                                     EOFS---v
-  //  +----+----+----+----+----+----------------+----+----+----+
-  //  |#ent|eofs| s0 | s1 | s2 |   free space   | r2 | r1 | r0 |
-  //  +----+----+-|--+-|--+-|--+----------------+-^--+-^--+-^--+
-  //             |    |    +---------------------+    |    |
-  //             |    +-------------------------------+    |
-  //             +-----------------------------------------+
+  void print(const Schema& schema){
+    for (size_t si = 0; si < entries; si++ ){
+      const offset_t opos = static_cast<offset_t>(sizeof(header_t) + si * sizeof(slot_t));
+      const offset_t lpos = static_cast<offset_t>(opos + sizeof(offset_t));
+      const offset_t off = read<offset_t>(buf.data(),opos);
+      const length_t len = read<length_t>(buf.data(),lpos);
+      std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(len);
+      std::memcpy(ptr.get(), &buf[off], len);
+      Record record = Record{.data=std::move(ptr), .schema=schema, .size=len};
+      std::printf("\n====== Page Id:{%d}, Record Id: {%zu}, Offset: {%d}, Length: {%d} ======\n",
+          id, si+1, off, len
+      );
+      record.print();
+    }
+  }
 
   int insert(const Record &record) {
     const length_t record_sz = static_cast<length_t>(record.size);
     if (free_space < record_sz){
-      return 1; // find another record with same catalogue (in pool or disk)
+      return 1;
     }
 
     const offset_t start = static_cast<uint16_t>(sizeof(header_t));
     const offset_t end = static_cast<uint16_t>(start + entries * sizeof(slot_t));
+
     offset_t p = start;
     const offset_t slot_sz = static_cast<offset_t>(sizeof(slot_t));
     for (; p < end; p += slot_sz ) {
@@ -90,7 +85,7 @@ struct Page {
       if (off == 0) break;
     }
 
-    const uint16_t insert_offset = free_space_offset - record_sz;
+    const offset_t insert_offset = free_space_offset - record_sz;
     write(buf.data(), insert_offset, record.data.get(), record_sz );
     write(buf.data(), p, insert_offset);
     const offset_t offset_sz = static_cast<offset_t>(sizeof(offset_t));
@@ -142,13 +137,10 @@ struct Page {
 
     const std::ptrdiff_t diff = static_cast<std::ptrdiff_t>(new_length - length);
 
-    //diff can be negative
-
     if ( static_cast<std::ptrdiff_t> (free_space < diff) ){} //TODO: need new page
 
     const offset_t end = static_cast<offset_t>((pos - sizeof(header_t))/sizeof(slot_t));
     const length_t record_len = static_cast<length_t>(record.size);
-
 
     if (diff < 0){
       const length_t ndiff = length - new_length;
