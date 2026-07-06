@@ -87,9 +87,9 @@ struct Page {
 
     const offset_t insert_offset = free_space_offset - record_sz;
     write(buf.data(), insert_offset, record.data.get(), record_sz );
-    write(buf.data(), p, insert_offset);
     const offset_t offset_sz = static_cast<offset_t>(sizeof(offset_t));
     const offset_t lpos = p + offset_sz;
+    write(buf.data(), p, insert_offset);
     write(buf.data(), lpos , record_sz);
 
     free_space -= static_cast<uint16_t>((record_sz + sizeof(slot_t)));
@@ -98,9 +98,6 @@ struct Page {
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
     write(buf.data(), ENTRIES_OFFSET, ++entries);
 
-
-    write(buf.data(), start, free_space_offset);
-    write(buf.data(), start + offset_sz, record_sz);
     return 0;
   }
 
