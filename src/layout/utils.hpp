@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include "types.hpp"
 
@@ -14,22 +15,20 @@ void write(uint8_t *data, offset_t offset, const T *val, length_t length) {
 };
 
 inline void write(uint8_t *data, offset_t offset_1, offset_t offset_2,
-           length_t length) {
+                  length_t length) {
   std::memmove(&data[offset_1], &data[offset_2], length);
 };
 
 inline std::string read(uint8_t *data, offset_t offset, length_t length) {
-  std::string val(reinterpret_cast<const char*>(&data[offset]),length);
+  std::string val(reinterpret_cast<const char *>(&data[offset]), length);
   return val;
 };
-
 
 template <typename T> T read(uint8_t *data, offset_t offset, length_t length) {
   T val{};
   std::memcpy(&val, &data[offset], length);
   return val;
 };
-
 
 template <typename T> T read(uint8_t *data, offset_t offset) {
   T val{};
