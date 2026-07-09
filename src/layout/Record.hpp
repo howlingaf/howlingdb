@@ -53,7 +53,7 @@ constexpr uint16_t ROUND_UP = 7;
 struct Record {
   std::unique_ptr<uint8_t[]> buf;
   const Schema &schema;
-  size_t size{};
+  uint16_t size{};
 
   void print() {
     for (size_t ci = 0; ci < schema.columns.size(); ci++) {
@@ -150,6 +150,7 @@ struct Record {
         write(buf.get(), slot.offset_pos, off + extra);
       }
     }
+    size = new_length;
   };
 
   template <typename T> void update(const Column &col, std::optional<T> opt) {

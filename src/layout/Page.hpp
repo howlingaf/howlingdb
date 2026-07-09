@@ -36,63 +36,56 @@
 
 struct Page {
   std::array<uint8_t, PAGE_SIZE> buf{};
-  ident_t id = 0;
+  ident_t id;
   uint16_t entries = 0;
-  length_t free_space = PAGE_SIZE - static_cast<length_t>(sizeof(header_t));
-  offset_t free_space_offset = PAGE_SIZE;
+  uint16_t free_space = PAGE_SIZE - HEADER_SIZE;
+  uint16_t free_space_offset = PAGE_SIZE;
   ident_t schema_id;
 
-
-  Page(ident_t schema_id) : schema_id(schema_id) {
+  Page(ident_t schema_id, ident_t page_id = 0)
+      : id(page_id), schema_id(schema_id) {
     write(buf.data(), ENTRIES_OFFSET, entries);
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
 
-  Page(ident_t page_id, ident_t schema_id) : id(page_id), schema_id(schema_id) {
-    write(buf.data(), ENTRIES_OFFSET, entries);
-    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
-  };
-
-  void print(const Schema& schema){
-    for (size_t si = 0; si < entries; si++ ){
-      const offset_t opos = static_cast<offset_t>(sizeof(header_t) + si * sizeof(slot_t));
-      const offset_t lpos = static_cast<offset_t>(opos + sizeof(offset_t));
-      const offset_t off = read<offset_t>(buf.data(),opos);
-      const length_t len = read<length_t>(buf.data(),lpos);
+  void print(const Schema &schema) {
+    for (size_t ci = 0; ci < entries; ci++) {
+      const Slot slot = Slot(HEADER_SIZE + ci * SLOT_SIZE);
+      const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
+      const uint16_t len = read<uint16_t>(buf.data(), slot.length_pos);
       std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(len);
       std::memcpy(ptr.get(), &buf[off], len);
-      Record record = Record{.data=std::move(ptr), .schema=schema, .size=len};
-      std::printf("\n====== Page Id:{%d}, Record Id: {%zu}, Offset: {%d}, Length: {%d} ======\n",
-          id, si+1, off, len
-      );
+      Record record =
+          Record{.buf = std::move(ptr), .schema = schema, .size = len};
+      std::printf("\n====== Page Id:{%d}, Record Id: {%zu}, Offset: {%d}, "
+                  "Length: {%d} ======\n",
+                  id, ci + 1, off, len);
       record.print();
     }
   }
 
   int insert(const Record &record) {
-    const length_t record_sz = static_cast<length_t>(record.size);
-    if (free_space < record_sz){
+    const uint16_t new_length = static_cast<uint16_t>(record.size);
+    if (free_space < new_length) {
+      // TODO:
       return 1;
     }
+    uint16_t pos = HEADER_SIZE;
+    const uint16_t fixed_data_offset_end =
+        static_cast<uint16_t>(HEADER_SIZE + entries * SLOT_SIZE);
 
-    const offset_t start = static_cast<uint16_t>(sizeof(header_t));
-    const offset_t end = static_cast<uint16_t>(start + entries * sizeof(slot_t));
-
-    offset_t p = start;
-    const offset_t slot_sz = static_cast<offset_t>(sizeof(slot_t));
-    for (; p < end; p += slot_sz ) {
-      const auto off = read<offset_t>(buf.data(), p);
-      if (off == 0) break;
+    for (; pos < fixed_data_offset_end; pos += SLOT_SIZE) {
+      if (read<uint16_t>(buf.data(), pos) == 0)
+        break;
     }
+    Slot slot = Slot(pos);
+    const uint16_t insert_offset =
+        static_cast<uint16_t>(free_space_offset - record.size);
+    write(buf.data(), insert_offset, record.buf.get(), record.size);
+    write(buf.data(), slot.offset_pos, insert_offset);
+    write(buf.data(), slot.length_pos, record.size);
 
-    const offset_t insert_offset = free_space_offset - record_sz;
-    write(buf.data(), insert_offset, record.data.get(), record_sz );
-    const offset_t offset_sz = static_cast<offset_t>(sizeof(offset_t));
-    const offset_t lpos = p + offset_sz;
-    write(buf.data(), p, insert_offset);
-    write(buf.data(), lpos , record_sz);
-
-    free_space -= static_cast<uint16_t>((record_sz + sizeof(slot_t)));
+    free_space -= static_cast<uint16_t>((record.size + SLOT_SIZE));
     free_space_offset = insert_offset;
 
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
@@ -101,9 +94,10 @@ struct Page {
     return 0;
   }
 
-  template <typename T> int update(const Schema& schema, const ident_t row_id, const Column &col, const T val) {
+  template <typename T>
+  int update(const Schema &schema, const ident_t row_id, const Column &col,
+             const T val) {
     std::cout << val << "\n";
-
 
     if (std::is_integral_v<T> && col.type != INT) {
       return 1;
@@ -117,70 +111,82 @@ struct Page {
       return 1;
     }
 
-    const offset_t pos = static_cast<offset_t>(sizeof(header_t) + row_id * sizeof(slot_t));
-    const offset_t offset = read<offset_t>(buf.data(), pos);
-    const offset_t offset_sz = static_cast<offset_t>(pos+sizeof(offset_t));
-    const length_t length = read<length_t>(buf.data(), pos+offset_sz);
-    
-    auto ptr = std::make_unique<uint8_t[]>(length);
-    
-    write(ptr.get(), 0, buf.data(), length);
+    uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
 
-    Record record = Record{.data=std::move(ptr), .schema=schema, .size=length};
+    Slot slot = Slot(pos);
+    const uint16_t old_offset = read<uint16_t>(buf.data(), slot.offset_pos);
+    const uint16_t old_length = read<uint16_t>(buf.data(), slot.length_pos);
+
+    auto ptr = std::make_unique<uint8_t[]>(old_length);
+    write(ptr.get(), 0, buf.data(), old_length);
+
+    Record record =
+        Record{.buf = std::move(ptr), .schema = schema, .size = old_length};
 
     record.update(col, val);
+    const uint16_t slot_end = HEADER_SIZE + entries * SLOT_SIZE;
 
-    const length_t new_length = record.var_length(col);
+    const std::ptrdiff_t diff =
+        static_cast<std::ptrdiff_t>(record.size - old_length);
 
-    const std::ptrdiff_t diff = static_cast<std::ptrdiff_t>(new_length - length);
+    if (static_cast<std::ptrdiff_t>(free_space < diff)) {
+    } // TODO: need new page
 
-    if ( static_cast<std::ptrdiff_t> (free_space < diff) ){} //TODO: need new page
+    if (diff < 0) {
+      const uint16_t pdiff = old_length - record.size;
+      write(buf.data(), old_offset, record.buf.get(), record.size);
 
-    const offset_t end = static_cast<offset_t>((pos - sizeof(header_t))/sizeof(slot_t));
-    const length_t record_len = static_cast<length_t>(record.size);
+      const uint16_t new_length =
+          static_cast<uint16_t>(old_offset + record.size);
 
-    if (diff < 0){
-      const length_t ndiff = length - new_length;
-      write( buf.data() , offset + ndiff, record.data.get(), record_len);
-      offset_t c = static_cast<offset_t>(pos - sizeof(slot_t));
-      for (;c >= end; c-= static_cast<offset_t>(sizeof(slot_t))){
+      const uint16_t new_free_space_offset =
+          static_cast<uint16_t>(free_space_offset + pdiff);
 
-        const offset_t off = read<offset_t>(buf.data(), c);
-        const length_t offset_sz = static_cast<length_t>(sizeof(offset_t));
-        const length_t len = read<length_t>(buf.data(), c + offset_sz);
-        const offset_t data = read<offset_t>(buf.data(), off, len);
+      write(buf.data(), free_space_offset, new_free_space_offset, new_length);
+      free_space_offset = new_free_space_offset;
 
-        write(buf.data(), off + ndiff, data, len);
-        write(buf.data(), c, off + ndiff);
-        write(buf.data(), c + offset_sz, len);
+      const uint16_t new_offset = static_cast<uint16_t>(old_offset + pdiff);
+
+      write(buf.data(), slot.offset_pos, new_offset);
+      write(buf.data(), slot.length_pos, record.size);
+
+      for (pos += SLOT_SIZE; pos < slot_end; pos += SLOT_SIZE) {
+        Slot slot = Slot(pos);
+        const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
+        if (off == 0)
+          continue;
+        const uint16_t new_offset = static_cast<uint16_t>(off + pdiff);
+        write(buf.data(), slot.offset_pos, new_offset);
       }
 
-      free_space += ndiff; 
-      free_space_offset += ndiff; 
+      free_space += pdiff;
 
     } else {
-      const length_t ndiff = new_length - length;
-      offset_t off = offset;
-      offset_t len = length;
-      offset_t prev_data{};
-      const length_t slot_sz = static_cast<length_t>(sizeof(slot_t));
-      for ( offset_t c = pos; c > end; c-= slot_sz ) {
-        const offset_t prev_off = read<offset_t>(buf.data(), pos - slot_sz);
-        const length_t prev_len = read<offset_t>(buf.data(), pos + offset_sz);
-        prev_data = read<offset_t>(buf.data(), prev_off, prev_len);
-        write(buf.data(), off - ndiff, record.data.get(), record_len );
-        write(buf.data(), pos, off - ndiff);
-        write(buf.data(), offset_sz + sizeof(offset_t), record_len);
-        off = prev_off; 
-        len = prev_len; 
-      }
-      write(buf.data(), off - ndiff, record.data.get(), record_len);
-      write(buf.data(), pos, off - ndiff);
-      write(buf.data(), pos + sizeof(offset_t), record_len);
 
-      free_space += ndiff; 
-      free_space_offset += ndiff; 
+      const uint16_t ndiff = static_cast<uint16_t>(record.size - old_length);
+      const uint16_t new_length =
+          static_cast<uint16_t>(old_offset + old_length + ndiff);
+      const uint16_t new_free_space_offset =
+          static_cast<uint16_t>(free_space_offset - ndiff);
+
+      write(buf.data(), free_space_offset, new_free_space_offset, new_length);
+      free_space_offset = new_free_space_offset;
+      const uint16_t new_offset = static_cast<uint16_t>(old_offset - ndiff);
+      write(buf.data(), new_offset, record.buf.get(), record.size);
+
+      write(buf.data(), slot.offset_pos, new_offset);
+      write(buf.data(), slot.length_pos, record.size);
+
+      for (pos += SLOT_SIZE; pos < slot_end; pos += SLOT_SIZE) {
+        Slot slot = Slot(pos);
+        const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
+        if (off == 0)
+          continue;
+        write(buf.data(), slot.offset_pos, static_cast<uint16_t>(off - ndiff));
+      }
+      free_space -= ndiff;
     }
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
     return 0;
   }
 
@@ -188,46 +194,36 @@ struct Page {
     if (entries <= row_id) {
       return 1;
     }
-    const offset_t new_offset = 0;
 
-    const offset_t start = static_cast<offset_t>(sizeof(header_t) + row_id * sizeof(slot_t));
-    const offset_t end = static_cast<offset_t>(start + entries * sizeof(slot_t));
-    const offset_t offset_sz = static_cast<offset_t>(sizeof(offset_t));
-    const length_t slot_sz = static_cast<offset_t>(sizeof(slot_t));
+    uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
+    const uint16_t slot_end = static_cast<uint16_t>(pos + entries * SLOT_SIZE);
 
-    auto offset = read<offset_t>(buf.data(), start);
-    auto length = read<length_t>(buf.data(), start + offset_sz);
+    Slot slot = Slot(pos);
+    uint16_t old_offset = read<uint16_t>(buf.data(), slot.offset_pos);
+    uint16_t old_length = read<uint16_t>(buf.data(), slot.length_pos);
 
-    if (offset == 0) return 0;
+    if (old_offset == 0)
+      return 0;
 
-    free_space += static_cast<length_t>(length + slot_sz);
-    write(buf.data(), ENTRIES_OFFSET, --entries);
-    write(buf.data(), start, new_offset);
+    uint16_t new_length = static_cast<uint16_t>(free_space_offset - old_offset);
+    const uint16_t new_free_space_offset =
+        static_cast<uint16_t>(free_space_offset + old_length);
 
-    offset_t p = static_cast<offset_t>(start + slot_sz);
+    write(buf.data(), free_space_offset, new_free_space_offset, new_length);
+    write(buf.data(), slot.offset_pos, 0);
+    write(buf.data(), slot.length_pos, 0);
+    free_space_offset = new_free_space_offset;
 
-    while (p < end) {
-
-      const offset_t prev_offset = offset;
-      const length_t prev_length = length;
-
-      offset = read<offset_t>(buf.data(), p);
-      length = read<length_t>(buf.data(), p + offset_sz );
-      if (offset == 0) break;
-
-      const offset_t insert_end = prev_offset + prev_length;
-      const offset_t insert_start = insert_end - length;
-      write(buf.data(), insert_start, offset, length);
-
-      offset = insert_start;
-      write(buf.data(), p, offset);
-      p += slot_sz;
+    for (pos += SLOT_SIZE; pos < slot_end; pos += SLOT_SIZE) {
+      Slot slot = Slot(pos);
+      const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
+      if (off == 0)
+        continue;
+      write(buf.data(), slot.offset_pos,
+            static_cast<uint16_t>(off + old_length));
     }
-    free_space_offset = offset;
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
-
+    write(buf.data(), ENTRIES_OFFSET, --entries);
     return 0;
   }
-
-
 };
