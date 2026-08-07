@@ -1,9 +1,7 @@
 #pragma once
 
-// #include <format>
-// #include <fstream>
-// #include <iostream>
-// #include <optional>
+#include <iostream>
+#include <optional>
 
 #include "../layout/Page.hpp"
 
@@ -11,7 +9,6 @@ struct DiskManager {
 
   int write(Page page) {
     std::cout << page.id; // catalog id
-    ;
     return 0;
   }
   //   auto table = std::format("{}-page", page.id);

@@ -11,7 +11,6 @@
 
 int main() {
   const std::string PATH_TO_CSV = "./example.csv";
-
   auto now = std::chrono::system_clock::now();
   std::cout << std::format("{:%F %T}", now) << '\n';
   std::ifstream file(PATH_TO_CSV);
