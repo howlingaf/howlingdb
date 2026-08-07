@@ -48,11 +48,11 @@ struct LRUCache {
   }
   bool is_full() { return pages.size() == POOL_LIMIT; }
 
-  void evict() {
+  void evict() { 
     const Page page = *pages.begin();
     pages.erase(pages.begin());
     disk_manager.write(page);
-  }
+    }
 
   Page evict(uint8_t page_id) {
     for (auto i = pages.begin(); i != pages.end(); i++) {
@@ -72,7 +72,7 @@ struct BufferPoolManager {
   // TODO: Pins
 
   int insert(const Schema &schema, Record record) {
-    const length_t len = static_cast<length_t>(record.size);
+    const uint16_t len = static_cast<uint16_t>(record.size);
     if (!curr_page.has_value()){
       curr_page = Page(1);
     }

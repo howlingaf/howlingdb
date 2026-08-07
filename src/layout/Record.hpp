@@ -2,12 +2,10 @@
 #include <cstdint>
 #include <memory>
 
-#include <algorithm>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <printf.h>
@@ -55,36 +53,35 @@ struct Record {
   const Schema &schema;
   uint16_t size{};
 
-  void print() {
+  std::vector<std::string> cells() const {
+    std::vector<std::string> out;
+    out.reserve(schema.columns.size());
     for (size_t ci = 0; ci < schema.columns.size(); ci++) {
-      const uint16_t pos = static_cast<uint16_t>(ci * sizeof(slot_t));
-      const Slot slot = Slot(pos);
+      const uint16_t pos = static_cast<uint16_t>(ci * FIXED_DATA_SIZE);
       switch (schema.columns[ci].type) {
-      case INT: {
-        const int val = read<int>(buf.get(), pos);
-        std::printf("Column {%zu}, Value: {%d} \n", ci, val);
+      case INT:
+        out.push_back(std::format("{}", read<int>(buf.get(), pos)));
         break;
-      }
-      case FLOAT: {
-        const float val = read<float>(buf.get(), pos);
-        std::printf("Column {%zu}, Value: {%f} \n", ci, val);
+      case FLOAT:
+        out.push_back(std::format("{}", read<float>(buf.get(), pos)));
         break;
-      }
       case VARCHAR: {
+        const Slot slot = Slot(pos);
         const uint16_t off = read<uint16_t>(buf.get(), slot.offset_pos);
         const uint16_t len = read<uint16_t>(buf.get(), slot.length_pos);
-        const std::string val = read(buf.get(), off, len);
-        std::printf("Column {%zu}, Value: {%s} \n", ci, val.c_str());
+        out.push_back(read(buf.get(), off, len));
         break;
       }
       default:
+        out.emplace_back();
         break;
-      };
+      }
     }
+    return out;
   }
 
   void update(const Column &col, std::string val) {
-    uint16_t ci = col_pos(col);
+    size_t ci = col_pos(col);
 
     const uint16_t bitmask = bitmask_offset();
     auto ith = (ROUND_UP - (ci % CHAR_BIT));
@@ -125,11 +122,10 @@ struct Record {
         curr_offset += len;
       }
     }
-
     if (curr_length < new_length) {
       const uint16_t extra = static_cast<uint16_t>(new_length - curr_length);
       const uint16_t next = curr_offset + curr_length;
-      auto entry = reinterpret_cast<unsigned char *>(val.data()); // TODO: ?
+      auto entry = reinterpret_cast<unsigned char *>(val.data());
       const uint16_t end = buf_end();
 
       buf[bitmask + ci / CHAR_BIT] |= static_cast<uint8_t>(1 << ith);
@@ -160,7 +156,7 @@ struct Record {
     auto ith = (ROUND_UP - (ci % CHAR_BIT));
 
     if (opt.has_value()) {
-      const uint16_t slot = ci * sizeof(slot_t);
+      const uint16_t slot = static_cast<uint16_t>(ci * sizeof(slot_t));
       buf[bitmask + ci / CHAR_BIT] |= static_cast<uint8_t>(1 << ith);
       write(buf.get(), slot, opt.value());
     } else
@@ -171,7 +167,7 @@ struct Record {
     for (size_t ci = schema.columns.size(); ci-- > 0;) {
       if (schema.columns[ci].type == VARCHAR) {
         const uint16_t pos = static_cast<uint16_t>(ci);
-        Slot slot = Slot(pos);
+        const Slot slot = Slot(pos);
         return slot.offset_pos + slot.length_pos;
       };
     }
@@ -191,25 +187,26 @@ struct Record {
     return off;
   }
 
-  uint16_t col_pos(const Column &col) {
-    for (size_t i = 0; i < schema.columns.size(); i++) {
-      if (schema.columns[i].name == col.name &&
-          schema.columns[i].type == col.type) {
-        return static_cast<uint16_t>(i);
+  size_t col_pos(const Column &col) {
+    for (size_t ci = 0; ci < schema.columns.size(); ci++) {
+      if (schema.columns[ci].name == col.name &&
+          schema.columns[ci].type == col.type) {
+        return ci;
       }
     }
-    throw std::runtime_error{"col not found"};
+    throw std::runtime_error{"Column not found"};
   }
 
   uint16_t var_length(const Column &col) {
-    for (uint16_t ci = 0; ci < schema.columns.size(); ci++) {
+    for (size_t ci = 0; ci < schema.columns.size(); ci++) {
       if (schema.columns[ci].name == col.name &&
           schema.columns[ci].type == col.type) {
-        Slot slot = Slot(static_cast<uint16_t>(ci * SLOT_SIZE));
+        const uint16_t pos = static_cast<uint16_t>(ci * SLOT_SIZE);
+        const Slot slot = Slot(pos);
         return read<uint16_t>(buf.get(), slot.length_pos);
       }
     }
-    throw std::runtime_error{"col not found"};
+    throw std::runtime_error{"Column not found"};
   }
 };
 
@@ -233,29 +230,29 @@ inline Record create_record(const std::vector<std::string> &fields,
       break;
     case VARCHAR: {
       capacity += static_cast<uint16_t>(SLOT_SIZE);
+      fixed_capacity += static_cast<uint16_t>(SLOT_SIZE);
       const uint16_t len = static_cast<uint16_t>(fields[ci].size());
       capacity += len;
       var_capacity += len;
       break;
     }
     default:
-      throw std::runtime_error("");
+      throw std::runtime_error{"Unknown Column Type found"};
     }
   }
 
   const uint16_t cols_len = static_cast<uint16_t>(schema.columns.size());
   const uint16_t bytes =
       static_cast<uint16_t>((cols_len + ROUND_UP) / CHAR_BIT);
-  capacity += static_cast<uint16_t>(sizeof(bytes));
+  capacity += static_cast<uint16_t>(bytes);
   const uint16_t bitmask_offset = fixed_capacity;
 
   auto buf = std::make_unique<uint8_t[]>(capacity);
-  std::fill(buf.get(), buf.get() + capacity, 1);
   std::memset(buf.get(), 0xFF, capacity);
 
   uint16_t fixed_offset = 0;
   uint16_t var_offset = capacity - var_capacity;
-  for (size_t ci = 0; ci < fields.size(); ++ci) {
+  for (size_t ci = 0; ci < schema.columns.size(); ++ci) {
 
     const uint8_t mask =
         static_cast<uint8_t>(1 << (ROUND_UP - (ci % CHAR_BIT)));
@@ -263,7 +260,6 @@ inline Record create_record(const std::vector<std::string> &fields,
     case INT: {
       if (!fields[ci].empty()) {
         const int val_as_int = std::stoi(fields[ci]);
-        std::printf("{%d}, fixed_offset={%d}\n", val_as_int, fixed_offset);
         write(buf.get(), fixed_offset, val_as_int);
         buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       } else {
@@ -276,8 +272,6 @@ inline Record create_record(const std::vector<std::string> &fields,
     case FLOAT: {
       if (!fields[ci].empty()) {
         const float val_as_float = std::stof(fields[ci]);
-        std::printf("Float {%f}, fixed_offset={%d}\n", val_as_float,
-                    fixed_offset);
         write(buf.get(), fixed_offset, val_as_float);
         buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       } else {
@@ -289,13 +283,12 @@ inline Record create_record(const std::vector<std::string> &fields,
 
     case VARCHAR: {
       const uint16_t len = static_cast<uint16_t>(fields[ci].size());
-      write(buf.get(), fixed_offset, var_offset);
-      const uint16_t len_offset =
-          fixed_offset + static_cast<uint16_t>(sizeof(uint16_t));
-      write(buf.get(), len_offset, len);
-      fixed_offset += static_cast<uint16_t>(sizeof(slot_t));
+      const Slot slot = Slot(fixed_offset);
+      write(buf.get(), slot.offset_pos, var_offset);
+      write(buf.get(), slot.length_pos, len);
+      fixed_offset += SLOT_SIZE;
       if (len == 0)
-        buf[fixed_offset + (ci / CHAR_BIT)] &= ~mask;
+        buf[bitmask_offset + (ci / CHAR_BIT)] &= ~mask;
       else {
         write(buf.get(), var_offset, fields[ci].data(), len);
         buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
@@ -304,9 +297,8 @@ inline Record create_record(const std::vector<std::string> &fields,
       break;
     }
     default:
-      throw std::runtime_error("Unknown column type found");
+      throw std::runtime_error{"Unknown Column Type found"};
     }
   }
-  std::cout << '\n';
   return Record{std::move(buf), schema, capacity};
 }
