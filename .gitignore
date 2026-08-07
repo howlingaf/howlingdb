@@ -1,5 +1,7 @@
 compile_flags.txt
 howlingdb
+page_test
+*.o
 rfc4180.txt
 .history
 .claude/
