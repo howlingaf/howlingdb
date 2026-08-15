@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
+# Rebuilds and runs both howldb and page_test on any save in the repo.
 
-target=howldb
-bin=./howlingdb
-if [[ $1 == -t ]]; then
-    target=page_test
-    bin=./page_test
-fi
+targets=(howldb page_test)
+bins=(./howlingdb ./page_test)
 
 while true; do
     clear
-    make -j "$target" && "$bin"
+    for i in "${!targets[@]}"; do
+        echo "=============== ${targets[$i]} ==============="
+        make -j "${targets[$i]}" && "${bins[$i]}"
+    done
     inotifywait -qq -r . @.git -e modify -e move \
         --exclude '(^|/)(page_test|howlingdb)$|\.(o|out)$'
 done
-
-./watcher.sh → builds/runs howldb; ./watcher.sh -t → page_test.
