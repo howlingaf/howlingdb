@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <format>
 
 #include "../catalog/Schema.hpp"
 #include "types.hpp"
@@ -53,7 +54,7 @@ struct Record {
   const Schema &schema;
   uint16_t size{};
 
-  std::vector<std::string> cells() const {
+  std::vector<std::string> buf_as_vector() const {
     std::vector<std::string> out;
     out.reserve(schema.columns.size());
     for (size_t ci = 0; ci < schema.columns.size(); ci++) {
@@ -263,7 +264,7 @@ inline Record create_record(const std::vector<std::string> &fields,
         write(buf.get(), fixed_offset, val_as_int);
         buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       } else {
-        write(buf.get(), fixed_offset, std::nullopt);
+        buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       }
       fixed_offset += static_cast<uint16_t>(sizeof(int));
       break;
@@ -275,7 +276,7 @@ inline Record create_record(const std::vector<std::string> &fields,
         write(buf.get(), fixed_offset, val_as_float);
         buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       } else {
-        write(buf.get(), fixed_offset, std::nullopt);
+        buf[bitmask_offset + (ci / CHAR_BIT)] |= mask;
       }
       fixed_offset += static_cast<uint16_t>(sizeof(float));
       break;
@@ -297,7 +298,7 @@ inline Record create_record(const std::vector<std::string> &fields,
       break;
     }
     default:
-      throw std::runtime_error{"Unknown Column Type found"};
+      throw std::runtime_error("Unknown column type found");
     }
   }
   return Record{std::move(buf), schema, capacity};

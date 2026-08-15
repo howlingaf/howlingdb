@@ -1,11 +1,16 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
-#include <iostream>
+
+inline void write_null(uint8_t *data, uint16_t offset) {
+  std::nullopt_t null =  std::nullopt;
+  std::memcpy(&data[offset], &null, (uint16_t) 1);
+}
 
 template <typename T> void write(uint8_t *data, uint16_t offset, const T &val) {
-  std::memcpy(&data[offset], &val, sizeof(val));
+  std::memcpy(&data[offset], &val, sizeof(T));
 };
 
 template <typename T>

@@ -12,11 +12,13 @@ constexpr uint16_t SLOT_SIZE = static_cast<uint16_t>(OFFSET_SIZE + LENGTH_SIZE);
 
 using ident_t = uint8_t;
 using slot_t = uint32_t;
+using count_t = uint16_t;
 
 constexpr uint16_t ENTRIES_OFFSET = 0;
-constexpr uint16_t FREE_SPACE_OFFSET = 2;
+constexpr uint16_t SLOTS_OFFSET = sizeof(ENTRIES_OFFSET);
+constexpr uint16_t FREE_SPACE_OFFSET = static_cast<uint16_t>( SLOTS_OFFSET + sizeof(SLOTS_OFFSET));
 constexpr uint16_t HEADER_SIZE =
-    static_cast<uint16_t>(sizeof(ENTRIES_OFFSET) + sizeof(FREE_SPACE_OFFSET));
+    static_cast<uint16_t>(FREE_SPACE_OFFSET + sizeof(FREE_SPACE_OFFSET));
 
 enum ColumnType : std::uint8_t { INT, FLOAT, VARCHAR };
 
