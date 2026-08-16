@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "Record.hpp"
 #include "types.hpp"
@@ -38,21 +39,14 @@
 // ======================================================================
 
 class Page {
-private:
-  std::array<uint8_t, PAGE_SIZE> buf{};
-  ident_t id;
-  const Schema schema;
-
-  /*
-    TODO: Scan (for what?)
-  */
-  void scan() const {}
 
 public:
+  ident_t id;
   count_t entries = 0;
-  count_t slots = 0;
   uint16_t free_space = PAGE_SIZE - HEADER_SIZE;
   uint16_t free_space_offset = PAGE_SIZE;
+  Schema schema;
+  count_t slots = 0;
 
   const std::array<uint8_t, PAGE_SIZE> &get_buf() const { return this->buf; }
 
@@ -61,6 +55,17 @@ public:
     write(buf.data(), ENTRIES_OFFSET, entries);
     write(buf.data(), SLOTS_OFFSET, slots);
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
+  };
+
+  std::vector<std::pair<ident_t, std::optional<Record>>> scan() const {
+    std::vector<std::pair<ident_t, std::optional<Record>>> live;
+    for (ident_t id = 0; id < slots; id++) {
+      std::optional<Record> record = get_record(id);
+      if (record.has_value()) {
+        live.emplace_back(id, std::move(*record));
+      }
+    }
+    return live;
   };
 
   std::optional<Record> get_record(const ident_t row_id) const {
@@ -79,15 +84,6 @@ public:
 
     return record;
   }
-
-  //  Block Header                              Records
-  //                                     EOFS---v
-  //  +----+----+----+----+----+----------------+----+----+----+
-  //  |#ent|eofs| s0 | s1 | s2 |   free space   | r2 | r1 | r0 |
-  //  +----+----+-|--+-|--+-|--+----------------+-^--+-^--+-^--+
-  //             |    |    +---------------------+    |    |
-  //             |    +-------------------------------+    |
-  //             +-----------------------------------------// hex dumps+
 
   int insert(const Record &record) {
     if (free_space < record.size) {
@@ -254,7 +250,6 @@ public:
         write<uint16_t>(buf.data(), slot.offset_pos,
                         static_cast<uint16_t>(off + length));
       }
-      curr += SLOT_SIZE;
     }
 
     free_space_offset = free_space_offset_1;
@@ -264,7 +259,7 @@ public:
     return 0;
   }
 
-  void print() {
+  void print() const {
     std::vector<std::vector<std::string>> rows;
     for (size_t i = 0; i < entries; i++) {
       const uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + i * SLOT_SIZE);
@@ -311,4 +306,8 @@ public:
       row(r);
     rule();
   }
+
+private:
+  std::array<uint8_t, PAGE_SIZE> buf{};
+  void update_headers();
 };
