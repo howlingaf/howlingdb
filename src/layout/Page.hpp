@@ -38,75 +38,75 @@
 // ======================================================================
 
 class Page {
-  private:
-    std::array<uint8_t, PAGE_SIZE> buf{};
-    ident_t id;
-    const Schema schema;
-    
-    /*
-      TODO: Scan (for what?)
-    */
-    void scan() const {
+private:
+  std::array<uint8_t, PAGE_SIZE> buf{};
+  ident_t id;
+  const Schema schema;
 
-    }
+  /*
+    TODO: Scan (for what?)
+  */
+  void scan() const {}
 
-  public: 
-    count_t entries = 0;
-    count_t slots = 0;
-    uint16_t free_space = PAGE_SIZE - HEADER_SIZE;
-    uint16_t free_space_offset = PAGE_SIZE;
-  
-  const std::array<uint8_t,PAGE_SIZE>& get_buf () const {
-    return this->buf;
-  }
+public:
+  count_t entries = 0;
+  count_t slots = 0;
+  uint16_t free_space = PAGE_SIZE - HEADER_SIZE;
+  uint16_t free_space_offset = PAGE_SIZE;
 
-  Page(const Schema& schema, ident_t page_id = 0)
+  const std::array<uint8_t, PAGE_SIZE> &get_buf() const { return this->buf; }
+
+  Page(const Schema &schema, ident_t page_id = 0)
       : id(page_id), schema(schema) {
     write(buf.data(), ENTRIES_OFFSET, entries);
     write(buf.data(), SLOTS_OFFSET, slots);
     write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
   };
-  
+
   std::optional<Record> get_record(const ident_t row_id) const {
-    const uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
+    const uint16_t pos =
+        static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
     const Slot slot = Slot(pos);
     const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
     const uint16_t len = read<uint16_t>(buf.data(), slot.length_pos);
-    if (off == 0) return std::nullopt;
+    if (off == 0)
+      return std::nullopt;
     auto ptr = std::make_unique<uint8_t[]>(len);
     write(ptr.get(), 0, &buf[off], len);
 
     Record record =
         Record{.buf = std::move(ptr), .schema = schema, .size = len};
-    
+
     return record;
   }
 
-//  Block Header                              Records
-//                                     EOFS---v
-//  +----+----+----+----+----+----------------+----+----+----+
-//  |#ent|eofs| s0 | s1 | s2 |   free space   | r2 | r1 | r0 |
-//  +----+----+-|--+-|--+-|--+----------------+-^--+-^--+-^--+
-//             |    |    +---------------------+    |    |
-//             |    +-------------------------------+    |
-//             +-----------------------------------------// hex dumps+
+  //  Block Header                              Records
+  //                                     EOFS---v
+  //  +----+----+----+----+----+----------------+----+----+----+
+  //  |#ent|eofs| s0 | s1 | s2 |   free space   | r2 | r1 | r0 |
+  //  +----+----+-|--+-|--+-|--+----------------+-^--+-^--+-^--+
+  //             |    |    +---------------------+    |    |
+  //             |    +-------------------------------+    |
+  //             +-----------------------------------------// hex dumps+
 
   int insert(const Record &record) {
     if (free_space < record.size) {
-      throw std::runtime_error{"Page doesn't have enough space to insert this record"};
+      throw std::runtime_error{
+          "Page doesn't have enough space to insert this record"};
     }
-    const uint16_t end =
-        static_cast<uint16_t>(HEADER_SIZE + SLOT_SIZE * slots);
+    const uint16_t end = static_cast<uint16_t>(HEADER_SIZE + SLOT_SIZE * slots);
 
     uint16_t pos = HEADER_SIZE;
     for (; pos < end; pos += SLOT_SIZE) {
       const Slot slot = Slot(pos);
       const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
-      if (off == 0) break;
+      if (off == 0)
+        break;
     }
 
     if (pos == end) {
       write(buf.data(), SLOTS_OFFSET, ++slots);
+      free_space = static_cast<uint16_t>(free_space - SLOT_SIZE);
     }
 
     const Slot slot = Slot(pos);
@@ -117,17 +117,16 @@ class Page {
     write(buf.data(), slot.offset_pos, insert_offset);
     write(buf.data(), slot.length_pos, record.size);
 
-    free_space = static_cast<uint16_t>((free_space - record.size - SLOT_SIZE));
+    free_space = static_cast<uint16_t>((free_space - record.size));
     free_space_offset = insert_offset;
     write(buf.data(), ENTRIES_OFFSET, ++entries);
-    write(buf.data(), FREE_SPACE_OFFSET,  free_space_offset);
+    write(buf.data(), FREE_SPACE_OFFSET, free_space_offset);
 
     return 0;
   }
 
   template <typename T>
-  int update(const ident_t row_id, const Column &col,
-             const T val) {
+  int update(const ident_t row_id, const Column &col, const T val) {
 
     if (std::is_integral_v<T> && col.type != INT) {
       return 1;
@@ -141,9 +140,10 @@ class Page {
       return 1;
     }
 
-    uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
+    const uint16_t site =
+        static_cast<uint16_t>(HEADER_SIZE + row_id * SLOT_SIZE);
 
-    const Slot slot = Slot(pos);
+    const Slot slot = Slot(site);
     const uint16_t old_offset = read<uint16_t>(buf.data(), slot.offset_pos);
     const uint16_t old_length = read<uint16_t>(buf.data(), slot.length_pos);
 
@@ -154,14 +154,16 @@ class Page {
         Record{.buf = std::move(ptr), .schema = schema, .size = old_length};
 
     record.update(col, val);
-    const uint16_t slot_end = static_cast<uint16_t>(HEADER_SIZE + entries * SLOT_SIZE);
+    const uint16_t end =
+        static_cast<uint16_t>(HEADER_SIZE + entries * SLOT_SIZE);
 
     const std::ptrdiff_t diff =
         static_cast<std::ptrdiff_t>(record.size - old_length);
 
     if (static_cast<std::ptrdiff_t>(free_space < diff)) {
-      throw std::runtime_error{"Page doesn't have enough space to insert this record"};
-    } 
+      throw std::runtime_error{
+          "Page doesn't have enough space to insert this record"};
+    }
 
     if (diff < 0) {
       const uint16_t pdiff = old_length - record.size;
@@ -180,11 +182,10 @@ class Page {
 
       write(buf.data(), slot.offset_pos, new_offset);
       write(buf.data(), slot.length_pos, record.size);
-
-      for (pos += SLOT_SIZE; pos < slot_end; pos += SLOT_SIZE) {
-        const Slot slot = Slot(pos);
+      for (uint16_t curr = HEADER_SIZE; curr < end; curr += SLOT_SIZE) {
+        const Slot slot = Slot(curr);
         const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
-        if (off == 0)
+        if (off == 0 && off < old_offset)
           continue;
         const uint16_t new_offset = static_cast<uint16_t>(off + pdiff);
         write(buf.data(), slot.offset_pos, new_offset);
@@ -208,10 +209,10 @@ class Page {
       write(buf.data(), slot.offset_pos, new_offset);
       write(buf.data(), slot.length_pos, record.size);
 
-      for (pos += SLOT_SIZE; pos < slot_end; pos += SLOT_SIZE) {
-        const Slot slot = Slot(pos);
+      for (uint16_t curr = HEADER_SIZE; curr < end; curr += SLOT_SIZE) {
+        const Slot slot = Slot(curr);
         const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
-        if (off == 0)
+        if (off == 0 && off < old_offset)
           continue;
         write(buf.data(), slot.offset_pos, static_cast<uint16_t>(off - ndiff));
       }
@@ -222,17 +223,21 @@ class Page {
   }
 
   int remove(ident_t row_id) {
-    if (slots < static_cast<uint16_t>(row_id + 1)) return 1;
+    if (slots < static_cast<uint16_t>(row_id + 1))
+      return 1;
 
-    uint16_t pos = static_cast<uint16_t>(HEADER_SIZE + SLOT_SIZE * row_id);
-    const Slot slot = Slot(pos);
+    const uint16_t site =
+        static_cast<uint16_t>(HEADER_SIZE + SLOT_SIZE * row_id);
+    const Slot slot = Slot(site);
     const uint16_t offset = read<uint16_t>(buf.data(), slot.offset_pos);
     const uint16_t length = read<uint16_t>(buf.data(), slot.length_pos);
-    
-    if (offset == 0) return 1;
-    
+
+    if (offset == 0)
+      return 1;
+
     const uint16_t free_space_offset_0 = free_space_offset;
-    const uint16_t remaining = static_cast<uint16_t>(offset - free_space_offset_0);
+    const uint16_t remaining =
+        static_cast<uint16_t>(offset - free_space_offset_0);
     const uint16_t free_space_offset_1 =
         static_cast<uint16_t>(free_space_offset_0 + length);
 
@@ -240,15 +245,16 @@ class Page {
     write<uint16_t>(buf.data(), slot.offset_pos, 0);
     write<uint16_t>(buf.data(), slot.length_pos, 0);
 
-    pos+=SLOT_SIZE;
     const uint16_t end = static_cast<uint16_t>(HEADER_SIZE + SLOT_SIZE * slots);
-    while (pos < end) {
-      const Slot slot = Slot(pos);
+
+    for (uint16_t curr = HEADER_SIZE; curr < end; curr += SLOT_SIZE) {
+      const Slot slot = Slot(curr);
       const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
-      if (off != 0 ){
-        write(buf.data(), slot.offset_pos, static_cast<uint16_t>(off + length));
+      if (off != 0 && off < offset) {
+        write<uint16_t>(buf.data(), slot.offset_pos,
+                        static_cast<uint16_t>(off + length));
       }
-      pos+=SLOT_SIZE;
+      curr += SLOT_SIZE;
     }
 
     free_space_offset = free_space_offset_1;
@@ -265,7 +271,8 @@ class Page {
       const Slot slot = Slot(pos);
       const uint16_t off = read<uint16_t>(buf.data(), slot.offset_pos);
       const uint16_t len = read<uint16_t>(buf.data(), slot.length_pos);
-      if (off == 0) continue;
+      if (off == 0)
+        continue;
       auto ptr = std::make_unique<uint8_t[]>(len);
       std::memcpy(ptr.get(), &buf[off], len);
       const Record record{.buf = std::move(ptr), .schema = schema, .size = len};
@@ -276,7 +283,7 @@ class Page {
     std::vector<int> widths(ncols);
     for (size_t c = 0; c < ncols; c++) {
       size_t w = schema.columns[c].name.size();
-      for (const auto& row : rows)
+      for (const auto &row : rows)
         w = std::max(w, row[c].size());
       widths[c] = static_cast<int>(w);
     }
@@ -287,22 +294,21 @@ class Page {
                     "--------------------------------------------------------");
       std::printf("+\n");
     };
-    auto row = [&](const std::vector<std::string>& cells) {
+    auto row = [&](const std::vector<std::string> &cells) {
       for (size_t c = 0; c < ncols; c++)
         std::printf("| %-*s ", widths[c], cells[c].c_str());
       std::printf("|\n");
     };
 
     std::vector<std::string> headers;
-    for (const auto& col : schema.columns)
+    for (const auto &col : schema.columns)
       headers.push_back(col.name);
 
     rule();
     row(headers);
     rule();
-    for (const auto& r : rows)
+    for (const auto &r : rows)
       row(r);
     rule();
   }
-
 };
