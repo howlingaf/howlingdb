@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
-#include <optional>
 
 #include "../catalog/Schema.hpp"
 #include "../disk_manager/DiskManager.hpp"
@@ -48,11 +47,11 @@ struct LRUCache {
   }
   bool is_full() { return pages.size() == POOL_LIMIT; }
 
-  void evict() { 
+  void evict() {
     const Page page = *pages.begin();
     pages.erase(pages.begin());
     disk_manager.write(page);
-    }
+  }
 
   Page evict(uint8_t page_id) {
     for (auto i = pages.begin(); i != pages.end(); i++) {
@@ -73,17 +72,17 @@ struct BufferPoolManager {
 
   int insert(const Schema &schema, Record record) {
     const uint16_t len = static_cast<uint16_t>(record.size);
-    if (!curr_page.has_value()){
-      curr_page = Page(1);
+    if (!curr_page.has_value()) {
+      curr_page = Page(schema);
     }
-    if (curr_page->free_space < len ) {
+    if (curr_page->free_space < len) {
       return 0;
       // look at pool
       // look at disk
       // if neither, create
     }
     curr_page->insert(record);
-    curr_page->print(schema);
+    curr_page->print();
     return 0;
   }
 
@@ -108,17 +107,18 @@ struct BufferPoolManager {
     return 1;
   }
 
-  template <typename T> int update(const Schema& schema, const ident_t page_id, const ident_t row_id, const T val) {
+  template <typename T>
+  int update(const Schema &schema, const ident_t page_id, const ident_t row_id,
+             const T val) {
 
     if (curr_page->id == page_id) {
       curr_page->update(schema, page_id, row_id, val);
       return 0;
     }
-    
-    //TODO: Pool
-    //TODO: Disk
+
+    // TODO: Pool
+    // TODO: Disk
 
     return 0;
   }
-
 };
