@@ -5,9 +5,9 @@
 #include <iostream>
 #include <string>
 
-#include "src/ingest/validate.hpp"
-#include "src/ingest/Parser.hpp"
 #include "src/buffer_pool_manager/BufferPoolManager.hpp"
+#include "src/ingest/Parser.hpp"
+#include "src/ingest/validate.hpp"
 
 int main() {
   const std::string PATH_TO_CSV = "./example.csv";
@@ -15,7 +15,8 @@ int main() {
   std::cout << std::format("{:%F %T}", now) << '\n';
   std::ifstream file(PATH_TO_CSV);
 
-  if (!file.is_open()) return 1;
+  if (!file.is_open())
+    return 1;
   const Result is_valid = validate(file);
 
   BufferPoolManager bpm;
